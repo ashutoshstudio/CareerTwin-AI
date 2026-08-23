@@ -98,7 +98,7 @@ CareerTwin-AI/
 - **Degree**: Bachelor of Computer Applications (BCA)
 - **Specialization**: Data Science
 - **Project Type**: Final Year Project
-- **Scope**: Localhost application (not deployed online)
+- **Scope**: Localhost application
 
 ---
 

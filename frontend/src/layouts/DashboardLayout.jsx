@@ -12,11 +12,18 @@ import { Outlet, NavLink } from 'react-router-dom';
 const NAV_ITEMS = [
   { to: '/dashboard',        label: '📊 Dashboard'         },
   { to: '/profile',          label: '👤 Profile'           },
+  { to: '/resume-analyzer',  label: '📄 Resume Analyzer'   },
+  { to: '/ats-score',        label: '📈 ATS Score'         },
   { to: '/assessment',       label: '📝 Assessment'        },
   { to: '/career-readiness', label: '🎯 Career Readiness'  },
   { to: '/skill-gap',        label: '🔍 Skill Gap'         },
   { to: '/job-matches',      label: '💼 Job Matches'       },
-  { to: '/recommendations',  label: '💡 Recommendations'   },
+  { to: '/explainable-ai',   label: '🧠 Explainable AI'    },
+  { to: '/assistant',        label: '🤖 Career Assistant'  },
+  { to: '/roadmap',          label: '🗺️ Learning Roadmap'  },
+  { to: '/github-analyzer',  label: '🐙 GitHub Analyzer'   },
+  { to: '/mock-interview',   label: '🎙️ Mock Interview'   },
+  { to: '/reports',          label: '📋 Reports'            },
 ];
 
 function DashboardLayout() {
