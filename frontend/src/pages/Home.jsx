@@ -1,477 +1,835 @@
 /**
- * Home.jsx — CareerTwin AI Professional Landing Page
- * Sections: Hero | Stats | Features | How It Works | Career Paths | XAI | CTA
+ * Home.jsx — CareerTwin AI Premium Motion-First Landing Page
+ * Theme: Nordic Emerald & Frosted Glass
+ * Fully integrated with Auth: guests/new users are routed to /register or /login,
+ * while logged-in users go directly to their chosen tools / roadmap / dashboard.
  */
 
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { useEffect, useRef } from 'react';
-import { CAREER_PATHS } from '../data/careerPaths';
+import {
+  motion,
+  AnimatePresence,
+  useInView,
+  useMotionValue,
+  useSpring,
+  useTransform,
+} from 'framer-motion';
+import { Check } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { useTypewriter } from '../hooks/useTypewriter';
+import { DEMO_READINESS, DEMO_JOB_MATCHES } from '../services/api';
+import { Interactive3DAvatar } from '../components/Interactive3DAvatar';
+import { PersistentShiningDots } from '../components/PersistentShiningDots';
 
-/* ── Data ──────────────────────────────────────────────────────────────── */
-const STATS = [
-  { value: '95%',    label: 'Prediction Accuracy',    icon: '🎯' },
-  { value: '50+',    label: 'Career Paths Covered',    icon: '🗺️' },
-  { value: '200+',   label: 'Skills Tracked',          icon: '🧠' },
-  { value: '10,000+',label: 'Jobs Analyzed',           icon: '💼' },
-];
+/* ── Shared motion variants ─────────────────────────────────────────────── */
+const fadeUp = (delay = 0) => ({
+  hidden:  { opacity: 0, y: 32 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.65, delay, ease: [0.22, 1, 0.36, 1] } },
+});
 
-const FEATURES = [
-  {
-    icon: '🎯',
-    title: 'Career Readiness Score',
-    desc: 'Get a personalised ML-powered readiness score showing exactly how prepared you are for your target role — with a clear percentage and breakdown.',
-    color: '#6366f1',
-  },
-  {
-    icon: '🔍',
-    title: 'Skill Gap Analysis',
-    desc: 'Instantly discover which skills you are missing for your dream job. Visual radar charts reveal your strengths and exact gaps to fill.',
-    color: '#22d3ee',
-  },
-  {
-    icon: '💼',
-    title: 'Intelligent Job Matching',
-    desc: 'Semantic AI matching compares your profile against thousands of real job descriptions and ranks the best-fit roles just for you.',
-    color: '#a78bfa',
-  },
-  {
-    icon: '🧠',
-    title: 'Explainable AI (XAI)',
-    desc: 'Unlike black-box systems, CareerTwin AI uses SHAP and LIME to explain every prediction — you always know why you got a particular score.',
-    color: '#34d399',
-  },
-  {
-    icon: '📊',
-    title: 'Interactive Dashboard',
-    desc: 'A rich analytics dashboard gives you a bird\'s-eye view of your career journey — progress charts, skill trends, and readiness history.',
-    color: '#f59e0b',
-  },
-  {
-    icon: '🤖',
-    title: 'AI Recommendations',
-    desc: 'Receive actionable, AI-generated next steps: which courses to take, which skills to learn first, and which jobs to apply to now.',
-    color: '#ec4899',
-  },
-];
+/* ── Reusable scroll reveal wrapper ────────────────────────────────────── */
+function Reveal({ children, delay = 0, className = '', y = 28 }) {
+  const ref    = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-60px 0px' });
+  return (
+    <motion.div
+      ref={ref}
+      className={className}
+      initial={{ opacity: 0, y }}
+      animate={inView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 0.65, delay, ease: [0.22, 1, 0.36, 1] }}
+    >
+      {children}
+    </motion.div>
+  );
+}
 
-const STEPS = [
-  {
-    num: '01',
-    title: 'Build Your Profile',
-    desc: 'Enter your education, skills, work experience, certifications, and target job roles. Your digital career twin is created instantly.',
-    icon: '👤',
-  },
-  {
-    num: '02',
-    title: 'Take the Assessment',
-    desc: 'Complete a smart career assessment. Our ML model analyses your inputs against industry benchmarks and real job market data.',
-    icon: '📝',
-  },
-  {
-    num: '03',
-    title: 'Get Insights & Match Jobs',
-    desc: 'Receive your readiness score, skill gap chart, matched job listings, and XAI-powered explanations — all on one dashboard.',
-    icon: '🚀',
-  },
-];
-
-
-
-const XAI_ITEMS = [
-  { label: 'SHAP Values',           desc: 'Shows which features most impacted your readiness score',       icon: '📉' },
-  { label: 'LIME Explanations',     desc: 'Local interpretable model for individual prediction explanation', icon: '🔬' },
-  { label: 'Feature Importance',    desc: 'Ranked list of skills driving your career match score',          icon: '📋' },
-  { label: 'Confidence Score',      desc: 'Each prediction comes with a model confidence percentage',       icon: '✅' },
-];
-
-/* ── Component ─────────────────────────────────────────────────────────── */
-function Home() {
-  const heroRef = useRef(null);
-  const statsRef = useRef(null);
-
-  /* Subtle parallax on hero orbs */
-  useEffect(() => {
-    const hero = heroRef.current;
-    if (!hero) return;
-    const onMove = (e) => {
-      const x = (e.clientX / window.innerWidth  - 0.5) * 30;
-      const y = (e.clientY / window.innerHeight - 0.5) * 30;
-      hero.style.setProperty('--px', `${x}px`);
-      hero.style.setProperty('--py', `${y}px`);
-    };
-    window.addEventListener('mousemove', onMove);
-    return () => window.removeEventListener('mousemove', onMove);
-  }, []);
-
-  /* Scroll reveal animation for stats cards */
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('stat-card--visible');
-          }
-        });
-      },
-      { threshold: 0.1, rootMargin: '0px 0px -50px 0px' }
-    );
-
-    const cards = statsRef.current?.querySelectorAll('.stat-card');
-    cards?.forEach((card) => observer.observe(card));
-
-    return () => {
-      cards?.forEach((card) => observer.unobserve(card));
-    };
-  }, []);
+/* ── Floating particles component ───────────────────────────────────────── */
+function Particles({ count = 20 }) {
+  const particles = useRef(
+    Array.from({ length: count }, (_, i) => ({
+      id: i,
+      left: `${Math.random() * 100}%`,
+      bottom: `${Math.random() * 30}%`,
+      size: `${Math.random() * 3 + 2}px`,
+      duration: `${Math.random() * 6 + 5}s`,
+      delay: `${Math.random() * 8}s`,
+      opacity: Math.random() * 0.6 + 0.3,
+    }))
+  ).current;
 
   return (
-    <div id="page-home" className="home">
+    <div className="hero__particles">
+      {particles.map((p) => (
+        <div
+          key={p.id}
+          className="hero__particle"
+          style={{
+            left: p.left,
+            bottom: p.bottom,
+            width: p.size,
+            height: p.size,
+            animationDuration: p.duration,
+            animationDelay: p.delay,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
 
-      {/* ── HERO ──────────────────────────────────────────────────────── */}
-      <section className="hero" ref={heroRef}>
-        {/* Animated background blobs */}
-        <div className="hero__blob hero__blob--1" />
-        <div className="hero__blob hero__blob--2" />
-        <div className="hero__blob hero__blob--3" />
+/* ── Animated count-up number ───────────────────────────────────────────── */
+function CountNumber({ to, suffix = '', duration = 1600 }) {
+  const ref    = useRef(null);
+  const inView = useInView(ref, { once: true });
+  const [display, setDisplay] = useState(0);
+  const frame = useRef(null);
 
-        {/* Grid overlay */}
-        <div className="hero__grid" />
+  useEffect(() => {
+    if (!inView) return;
+    let start = null;
+    const step = (ts) => {
+      if (!start) start = ts;
+      const progress = Math.min((ts - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplay(Math.floor(eased * to));
+      if (progress < 1) frame.current = requestAnimationFrame(step);
+      else setDisplay(to);
+    };
+    frame.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame.current);
+  }, [inView, to, duration]);
 
-        <div className="hero__content">
-          <div className="hero__left">
-            <div className="hero__badge">
-              <span className="hero__badge-dot" />
-              Powered by Explainable Machine Learning
-            </div>
+  return <span ref={ref}>{display}{suffix}</span>;
+}
 
-            <h1 className="hero__title">
-              Your Personal<br />
-              <span className="hero__title-gradient">Career Twin</span><br />
-              Powered by AI
-            </h1>
+/* ─────────────────────────────────────────────────────────────────────────
+   DATA
+   ───────────────────────────────────────────────────────────────────────── */
+const READINESS_BARS = [
+  { label: 'Technical Skills', pct: DEMO_READINESS.breakdown.technicalSkills },
+  { label: 'Projects',         pct: DEMO_READINESS.breakdown.projects         },
+  { label: 'Communication',    pct: DEMO_READINESS.breakdown.communication    },
+  { label: 'Problem Solving',  pct: DEMO_READINESS.breakdown.problemSolving   },
+];
 
-            <p className="hero__subtitle">
-              CareerTwin AI analyses your skills, education, and goals to predict your
-              career readiness, expose skill gaps, and match you to the perfect job —
-              with full <strong>AI transparency</strong> so you understand every insight.
-            </p>
+const XAI_POS = ['Strong Python proficiency', 'Relevant ML projects', 'SQL knowledge', 'Good GitHub activity'];
+const XAI_NEG = ['Missing: Deep Learning', 'Limited industry experience', 'Missing: Power BI', 'No cloud certification'];
 
-            <div className="hero__actions">
-              <Link to="/register" id="hero-cta-primary" className="btn-hero btn-hero--primary">
-                🚀 Start Your Career Assessment
+const ROADMAP_STEPS = [
+  { num: '01', title: 'Python & Statistics',   desc: 'Build strong foundations in Python programming and statistical thinking.' },
+  { num: '02', title: 'SQL & Data Analysis',   desc: 'Master querying, data wrangling, and exploratory data analysis.' },
+  { num: '03', title: 'Machine Learning',      desc: 'Learn supervised and unsupervised algorithms with scikit-learn.' },
+  { num: '04', title: 'Projects & Portfolio',  desc: 'Build 2–3 end-to-end ML projects and publish them on GitHub.' },
+  { num: '05', title: 'Interview Preparation', desc: 'Practice ML case studies, coding challenges, and system design.' },
+];
+
+const PILL_OPTIONS = [
+  'Resume Analysis', 'Career Readiness', 'Skill Gap', 'Job Matching',
+  'AI Assistant', 'Learning Roadmap', 'GitHub Analysis', 'Mock Interview',
+];
+
+const PILL_ROUTE_MAP = {
+  'Resume Analysis':   '/resume-analyzer',
+  'Career Readiness':  '/career-readiness',
+  'Skill Gap':         '/skill-gap',
+  'Job Matching':      '/job-matches',
+  'AI Assistant':      '/assistant',
+  'Learning Roadmap':  '/roadmap',
+  'GitHub Analysis':   '/github-analyzer',
+  'Mock Interview':    '/mock-interview',
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HERO SECTION — Mouse parallax + floating cards + particles + orbs
+   ═══════════════════════════════════════════════════════════════════════════ */
+const HERO_CARDS = [
+  {
+    label: 'Career Readiness', value: 82,  suffix: '',   unit: '/ 100',
+    trend: '↑ +12 this month', barW: 82,
+    cls: 'float-bob-1',
+    style: { top: '-2%', left: '-8%' },
+    pulseDelay: 0, ox: 0.55, oy: 0.55,
+  },
+  {
+    label: 'GitHub Score', value: 84,  suffix: '',   unit: '/ 100',
+    trend: '↑ Active committer', barW: 84,
+    cls: 'float-bob-4',
+    style: { top: '-4%', right: '-4%' },
+    pulseDelay: 0.8, ox: -0.5, oy: 0.6,
+  },
+  {
+    label: 'Skill Match', value: 89,  suffix: '%',  unit: '',
+    trend: '↑ Above average', barW: 89,
+    cls: 'float-bob-2',
+    style: { top: '44%', right: '-12%' },
+    pulseDelay: 1.6, ox: -0.55, oy: -0.45,
+  },
+  {
+    label: 'ATS Score', value: 78,  suffix: '%',  unit: '',
+    trend: '↑ Good format', barW: 78,
+    cls: 'float-bob-3',
+    style: { bottom: '8%', left: '-10%' },
+    pulseDelay: 2.4, ox: 0.6, oy: -0.5,
+  },
+  {
+    label: 'Job Match', value: 91,  suffix: '%',  unit: '',
+    trend: '↑ Top candidate', barW: 91,
+    cls: 'float-bob-5',
+    style: { bottom: '-2%', right: '-6%' },
+    pulseDelay: 3.2, ox: -0.4, oy: -0.7,
+  },
+];
+
+function HeroCard({ card, springX, springY }) {
+  const x = useTransform(springX, (v) => v * card.ox);
+  const y = useTransform(springY, (v) => v * card.oy);
+
+  return (
+    <motion.div
+      className={`hero-card ${card.cls}`}
+      style={{ ...card.style, x, y }}
+      initial={{ opacity: 0, scale: 0.7, y: 30 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ duration: 0.7, delay: 0.9 + card.pulseDelay * 0.18, ease: [0.22, 1, 0.36, 1] }}
+      whileHover={{ scale: 1.06, zIndex: 10 }}
+    >
+      {/* Pulse rings */}
+      <div className="hero-card__pulse" style={{ animationDelay: `${card.pulseDelay}s` }} />
+      <div className="hero-card__pulse-2" style={{ animationDelay: `${card.pulseDelay + 1}s` }} />
+
+      <div className="hero-card__label">
+        <span className="hero-card__dot" />
+        {card.label}
+      </div>
+      <div className="hero-card__value">
+        <CountNumber to={card.value} suffix={card.suffix} duration={1800} />
+        {card.unit && (
+          <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)', marginLeft: 2 }}>
+            {card.unit}
+          </span>
+        )}
+      </div>
+      <div className="hero-card__bar">
+        <motion.div
+          className="hero-card__bar-fill"
+          initial={{ width: 0 }}
+          animate={{ width: `${card.barW}%` }}
+          transition={{ duration: 1.2, delay: 1.2 + card.pulseDelay * 0.18, ease: [0.22, 1, 0.36, 1] }}
+        />
+      </div>
+      <div className="hero-card__trend">{card.trend}</div>
+    </motion.div>
+  );
+}
+
+function HeroSection() {
+  const { isAuthenticated } = useAuth();
+  const HERO_TEXT = "Know where you stand.\nKnow where you're going.";
+  const { displayed, done } = useTypewriter({ text: HERO_TEXT, speed: 40, startDelay: 500 });
+
+  const mouseX   = useMotionValue(0);
+  const mouseY   = useMotionValue(0);
+  const springX  = useSpring(mouseX, { stiffness: 45, damping: 16 });
+  const springY  = useSpring(mouseY, { stiffness: 45, damping: 16 });
+
+  useEffect(() => {
+    const handleGlobalMove = (e) => {
+      const normX = (e.clientX / window.innerWidth - 0.5) * 35;
+      const normY = (e.clientY / window.innerHeight - 0.5) * 35;
+      mouseX.set(normX);
+      mouseY.set(normY);
+    };
+    window.addEventListener('mousemove', handleGlobalMove);
+    return () => window.removeEventListener('mousemove', handleGlobalMove);
+  }, [mouseX, mouseY]);
+
+  const onMouseMove = useCallback((e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    mouseX.set(((e.clientX - rect.left) / rect.width  - 0.5) * 35);
+    mouseY.set(((e.clientY - rect.top)  / rect.height - 0.5) * 35);
+  }, [mouseX, mouseY]);
+
+  const startCtaUrl = isAuthenticated ? '/dashboard' : '/register?redirect=%2Fdashboard';
+
+  return (
+    <section className="hero" onMouseMove={onMouseMove}>
+      {/* Animated ambient orbs */}
+      <div className="hero__orb hero__orb--1" />
+      <div className="hero__orb hero__orb--2" />
+      <div className="hero__orb hero__orb--3" />
+
+      {/* Floating particles */}
+      <Particles count={24} />
+
+      {/* Grid dot pattern */}
+      <div style={{
+        position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none',
+        backgroundImage: 'radial-gradient(circle, rgba(16,185,129,0.12) 1px, transparent 1px)',
+        backgroundSize: '36px 36px',
+        maskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%)',
+      }} />
+
+      <div className="container" style={{ position: 'relative', zIndex: 1 }}>
+        <div className="hero__inner">
+          {/* ── Left: copy ──────────────────────────── */}
+          <div>
+            <motion.div
+              className="hero__eyebrow"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.55, delay: 0.2 }}
+            >
+              BCA Data Science · Academic Project 2024–25
+            </motion.div>
+
+            <motion.h1
+              className="hero__heading"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              style={{ whiteSpace: 'pre-line' }}
+            >
+              <span className="anim-gradient-text">{displayed}</span>
+              {!done && <span className="animate-blink" style={{
+                display: 'inline-block', width: 3, height: '1em',
+                background: 'var(--emerald-light)', verticalAlign: 'text-bottom',
+                marginLeft: 2, borderRadius: 2,
+              }} />}
+            </motion.h1>
+
+            <motion.p
+              className="hero__desc"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: done ? 1 : 0 }}
+              transition={{ duration: 0.6 }}
+            >
+              CareerTwin AI analyses your skills, resume, projects and experience
+              to reveal your career readiness score, identify skill gaps and match
+              you with opportunities that fit your real potential.
+            </motion.p>
+
+            <motion.div
+              className="hero__cta-group"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: done ? 1 : 0, y: done ? 0 : 12 }}
+              transition={{ duration: 0.5 }}
+            >
+              <Link to={startCtaUrl} className="btn btn--primary" id="hero-cta-start">
+                Start Free Assessment <span className="btn__arrow">→</span>
               </Link>
-              <Link to="/login" id="hero-cta-secondary" className="btn-hero btn-hero--secondary">
-                Sign In →
+              <Link to="/how-it-works" className="btn btn--outline" id="hero-cta-how">
+                See How It Works
               </Link>
-            </div>
+            </motion.div>
 
-            <div className="hero__trust">
-              <span>🎯 ML-Powered Readiness Score</span>
-              <span>·</span>
-              <span>🔍 Skill Gap Analysis</span>
-              <span>·</span>
-              <span>🧠 XAI Transparency</span>
-              <span>·</span>
-              <span>💼 Semantic Job Matching</span>
-            </div>
-          </div>
-
-          {/* 3D Floating Card Visual */}
-          <div className="hero__right">
-            <div className="hero__3d-scene">
-
-              {/* Main card */}
-              <div className="card-3d card-3d--main">
-                <div className="card-3d__header">
-                  <span className="card-3d__dot card-3d__dot--r" />
-                  <span className="card-3d__dot card-3d__dot--y" />
-                  <span className="card-3d__dot card-3d__dot--g" />
-                  <span className="card-3d__label">Career Readiness Score</span>
-                </div>
-                <div className="card-3d__score-ring">
-                  <svg viewBox="0 0 120 120" className="card-3d__ring-svg">
-                    <circle cx="60" cy="60" r="50" className="card-3d__ring-bg" />
-                    <circle cx="60" cy="60" r="50" className="card-3d__ring-fill" />
-                  </svg>
-                  <div className="card-3d__score-text">
-                    <span className="card-3d__score-num">82%</span>
-                    <span className="card-3d__score-sub">Readiness</span>
+            {/* Live stats row */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: done ? 1 : 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              style={{ display: 'flex', gap: 28, marginTop: 40, flexWrap: 'wrap' }}
+            >
+              {[
+                { num: 200, suffix: '+', label: 'Skills tracked' },
+                { num: 95,  suffix: '%', label: 'ML accuracy'    },
+                { num: 50,  suffix: '+', label: 'Career paths'   },
+              ].map((s) => (
+                <div key={s.label}>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--emerald-light)', lineHeight: 1, textShadow: '0 0 16px rgba(16,185,129,0.4)' }}>
+                    <CountNumber to={s.num} suffix={s.suffix} duration={2000} />
                   </div>
+                  <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginTop: 3 }}>{s.label}</div>
                 </div>
-                <div className="card-3d__skills">
-                  {[
-                    { skill: 'Python',       pct: 90 },
-                    { skill: 'ML Models',    pct: 75 },
-                    { skill: 'Data Viz',     pct: 68 },
-                    { skill: 'SQL',          pct: 85 },
-                  ].map(({ skill, pct }) => (
-                    <div key={skill} className="card-3d__skill-row">
-                      <span className="card-3d__skill-name">{skill}</span>
-                      <div className="card-3d__skill-bar">
-                        <div className="card-3d__skill-fill" style={{ width: `${pct}%` }} />
-                      </div>
-                      <span className="card-3d__skill-pct">{pct}%</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Floating chip — Job Match */}
-              <div className="card-3d card-3d--chip card-3d--chip-1">
-                <span className="card-3d__chip-icon">💼</span>
-                <div>
-                  <div className="card-3d__chip-title">Top Match</div>
-                  <div className="card-3d__chip-sub">Data Scientist · 94% fit</div>
-                </div>
-              </div>
-
-              {/* Floating chip — Skill Gap */}
-              <div className="card-3d card-3d--chip card-3d--chip-2">
-                <span className="card-3d__chip-icon">🔍</span>
-                <div>
-                  <div className="card-3d__chip-title">Skill Gap Found</div>
-                  <div className="card-3d__chip-sub">Learn: Deep Learning</div>
-                </div>
-              </div>
-
-              {/* Floating chip — XAI */}
-              <div className="card-3d card-3d--chip card-3d--chip-3">
-                <span className="card-3d__chip-icon">🧠</span>
-                <div>
-                  <div className="card-3d__chip-title">AI Explained</div>
-                  <div className="card-3d__chip-sub">SHAP · LIME · Transparent</div>
-                </div>
-              </div>
-
-              {/* Floating chip — Confidence */}
-              <div className="card-3d card-3d--chip card-3d--chip-4">
-                <span className="card-3d__chip-icon">✅</span>
-                <div>
-                  <div className="card-3d__chip-title">Confidence</div>
-                  <div className="card-3d__chip-sub">Model accuracy: 95.2%</div>
-                </div>
-              </div>
-
-            </div>
+              ))}
+            </motion.div>
           </div>
-        </div>
 
-        {/* Scroll indicator */}
-        <div className="hero__scroll">
-          <div className="hero__scroll-mouse"><div className="hero__scroll-wheel" /></div>
-          <span>Scroll to explore</span>
-        </div>
-      </section>
-
-      {/* ── STATS ─────────────────────────────────────────────────────── */}
-      <section className="stats-section" id="stats">
-        <div className="container">
-          <div className="stats-grid" ref={statsRef}>
-            {STATS.map((s, i) => (
-              <div
-                key={s.label}
-                className="stat-card"
-                style={{ '--delay': `${i * 120}ms` }}
-              >
-                <span className="stat-card__icon">{s.icon}</span>
-                <div className="stat-card__value">{s.value}</div>
-                <div className="stat-card__label">{s.label}</div>
-              </div>
+          {/* ── Right: 3D Interactive Character + floating analytics cards ─────── */}
+          <div className="hero-visual">
+            <Interactive3DAvatar springX={springX} springY={springY} />
+            {HERO_CARDS.map((card) => (
+              <HeroCard key={card.label} card={card} springX={springX} springY={springY} />
             ))}
           </div>
         </div>
-      </section>
+      </div>
+    </section>
+  );
+}
 
-      {/* ── FEATURES ──────────────────────────────────────────────────── */}
-      <section className="section" id="features">
+/* ═══════════════════════════════════════════════════════════════════════════
+   INTEREST PILLS
+   ═══════════════════════════════════════════════════════════════════════════ */
+function PillsSection() {
+  const { isAuthenticated } = useAuth();
+  const [selected, setSelected] = useState([]);
+  const toggle = (p) => setSelected((prev) =>
+    prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
+  );
+
+  // Target destination based on selection
+  const firstTarget = selected.length > 0 ? (PILL_ROUTE_MAP[selected[0]] || '/dashboard') : '/dashboard';
+  const exploreUrl = isAuthenticated
+    ? firstTarget
+    : `/register?redirect=${encodeURIComponent(firstTarget)}`;
+
+  return (
+    <Reveal>
+      <section className="pills-section" id="explore-section">
         <div className="container">
-          <div className="section__header">
-            <div className="section__tag">Core Capabilities</div>
-            <h2 className="section__title">Everything You Need to<br /><span className="gradient-text">Accelerate Your Career</span></h2>
-            <p className="section__subtitle">
-              Six powerful AI-driven modules work together to give you a complete,
-              data-backed picture of your career potential.
-            </p>
+          <p className="pills-title">What would you like to <span className="anim-gradient-text">explore?</span></p>
+          <p className="pills-subtitle">Select every area you're interested in — we'll guide you.</p>
+
+          <div className="pills-grid">
+            {PILL_OPTIONS.map((pill, i) => {
+              const active = selected.includes(pill);
+              return (
+                <motion.button
+                  key={pill}
+                  id={`pill-${pill.toLowerCase().replace(/\s+/g, '-')}`}
+                  className={`pill ${active ? 'pill--active' : ''}`}
+                  onClick={() => toggle(pill)}
+                  initial={{ opacity: 0, y: 16 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.055, duration: 0.4 }}
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.96 }}
+                >
+                  <AnimatePresence mode="wait">
+                    {active && (
+                      <motion.span
+                        key="check"
+                        initial={{ scale: 0, opacity: 0, rotate: -90 }}
+                        animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                        exit={{ scale: 0, opacity: 0 }}
+                        transition={{ duration: 0.18 }}
+                      >
+                        <Check size={13} strokeWidth={3} />
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                  {pill}
+                </motion.button>
+              );
+            })}
           </div>
-          <div className="features-grid">
-            {FEATURES.map((f) => (
-              <div key={f.title} className="feature-card" style={{ '--accent': f.color }}>
-                <div className="feature-card__icon-wrap">
-                  <span className="feature-card__icon">{f.icon}</span>
-                </div>
-                <h3 className="feature-card__title">{f.title}</h3>
-                <p className="feature-card__desc">{f.desc}</p>
-                <div className="feature-card__glow" />
-              </div>
-            ))}
-          </div>
+
+          <AnimatePresence mode="wait">
+            {selected.length === 0 ? (
+              <motion.p key="empty" className="pills-feedback"
+                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.3 }}>
+                Choose areas above to get started.
+              </motion.p>
+            ) : (
+              <motion.div key="selected"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.35 }}>
+                <p className="pills-feedback">
+                  Great choices! Ready to explore: <strong>{selected.join(', ')}</strong>
+                </p>
+                <Link to={exploreUrl}>
+                  <motion.button className="pills-cta" id="pills-cta-btn"
+                    whileHover={{ scale: 1.04, x: 4 }} whileTap={{ scale: 0.97 }}>
+                    Start Exploring →
+                  </motion.button>
+                </Link>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </section>
+    </Reveal>
+  );
+}
 
-      {/* ── HOW IT WORKS ──────────────────────────────────────────────── */}
-      <section className="section section--alt" id="how-it-works">
-        <div className="container">
-          <div className="section__header">
-            <div className="section__tag">Process</div>
-            <h2 className="section__title">How <span className="gradient-text">CareerTwin AI</span> Works</h2>
+/* ═══════════════════════════════════════════════════════════════════════════
+   CAREER READINESS — animated score + bars
+   ═══════════════════════════════════════════════════════════════════════════ */
+function ReadinessSection() {
+  const ref    = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-80px 0px' });
+
+  return (
+    <section className="readiness-section" id="readiness-section">
+      <div className="container">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'center' }}>
+          <Reveal>
+            <div className="section__tag">Career Readiness</div>
+            <h2 className="section__title">How prepared<br /><span className="anim-gradient-text">are you?</span></h2>
             <p className="section__subtitle">
-              Three simple steps — from raw profile data to actionable career intelligence.
+              Your Career Readiness Score is calculated by our ML model from your
+              skills, projects, experience and assessments — with full XAI transparency.
             </p>
-          </div>
-          <div className="steps-grid">
-            {STEPS.map((step, i) => (
-              <div key={step.num} className="step-card">
-                <div className="step-card__num">{step.num}</div>
-                <div className="step-card__icon">{step.icon}</div>
-                <h3 className="step-card__title">{step.title}</h3>
-                <p className="step-card__desc">{step.desc}</p>
-                {i < STEPS.length - 1 && <div className="step-card__arrow">→</div>}
+          </Reveal>
+
+          <div ref={ref}>
+            <motion.div
+              style={{ position: 'relative', display: 'inline-block' }}
+              initial={{ opacity: 0, scale: 0.7 }}
+              animate={inView ? { opacity: 1, scale: 1 } : {}}
+              transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            >
+              {/* Outer glow ring */}
+              <motion.div style={{
+                position: 'absolute', inset: -20, borderRadius: '50%',
+                border: '1px solid rgba(16,185,129,0.3)',
+                animation: inView ? 'pulseRing 3s ease-out infinite' : 'none',
+              }} />
+              <div className="readiness-score">
+                {inView ? <CountNumber to={DEMO_READINESS.overall} duration={1800} /> : '0'}
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
+            </motion.div>
+            <div className="readiness-label">/ 100 Career Readiness Score</div>
 
-      {/* ── CAREER PATHS ──────────────────────────────────────────────── */}
-      <section className="section" id="career-paths">
-        <div className="container">
-          <div className="section__header">
-            <div className="section__tag">Supported Roles</div>
-            <h2 className="section__title">Explore <span className="gradient-text">In-Demand</span> Career Paths</h2>
-            <p className="section__subtitle">
-              CareerTwin AI benchmarks your profile against real requirements for today's
-              most sought-after technology roles.
-            </p>
-          </div>
-          <div className="careers-grid">
-            {CAREER_PATHS.map((c) => (
-              <Link
-                key={c.title}
-                to={`/careers/${c.slug}`}
-                className="career-card"
-                style={{ textDecoration: 'none', display: 'block', cursor: 'pointer' }}
-              >
-                <div className="career-card__top">
-                  <span className="career-card__icon">{c.icon}</span>
-                  <span className="career-card__demand">{c.demand}</span>
-                </div>
-                <h3 className="career-card__title">{c.title}</h3>
-                <div className="career-card__skills">
-                  {c.skills.map((sk) => (
-                    <span
-                      key={sk}
-                      className="skill-tag"
-                      style={{ cursor: 'pointer' }}
+            <div className="readiness-bars">
+              {READINESS_BARS.map((bar, i) => (
+                <div key={bar.label}>
+                  <div className="skill-bar__label">
+                    <span>{bar.label}</span>
+                    <motion.span
+                      initial={{ opacity: 0 }}
+                      animate={inView ? { opacity: 1 } : {}}
+                      transition={{ delay: 0.4 + i * 0.1 }}
                     >
-                      {sk}
-                    </span>
-                  ))}
+                      {bar.pct}%
+                    </motion.span>
+                  </div>
+                  <div className="skill-bar__track">
+                    <motion.div
+                      className="skill-bar__fill"
+                      initial={{ scaleX: 0 }}
+                      animate={inView ? { scaleX: bar.pct / 100 } : {}}
+                      transition={{ duration: 1.1, delay: 0.3 + i * 0.12, ease: [0.22, 1, 0.36, 1] }}
+                    />
+                  </div>
                 </div>
-                <div style={{
-                  marginTop: 14,
-                  fontSize: '.75rem',
-                  color: 'var(--primary-light)',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  opacity: 0.8,
-                }}>
-                  View details →
-                </div>
-              </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   JOB MATCHING
+   ═══════════════════════════════════════════════════════════════════════════ */
+function JobMatchSection() {
+  const ref    = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-80px 0px' });
+
+  return (
+    <section className="jobs-section" id="jobmatch-section">
+      <div className="container">
+        <Reveal>
+          <div className="section__tag">Intelligent Job Matching</div>
+          <h2 className="section__title">Jobs ranked <span className="anim-gradient-text">for you.</span></h2>
+          <p className="section__subtitle">
+            Semantic AI matches your full profile against thousands of live job postings
+            and shows your compatibility percentage — not just keyword overlap.
+          </p>
+        </Reveal>
+
+        <div ref={ref} className="jobs-grid">
+          {DEMO_JOB_MATCHES.map((job, i) => (
+            <motion.div
+              key={job.title}
+              className="job-card shimmer-card"
+              id={`job-card-${i}`}
+              initial={{ opacity: 0, y: 30, scale: 0.95 }}
+              animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
+              transition={{ duration: 0.55, delay: i * 0.14 }}
+              whileHover={{ y: -7, scale: 1.03 }}
+            >
+              <motion.div
+                className="job-card__match"
+                initial={{ opacity: 0 }}
+                animate={inView ? { opacity: 1 } : {}}
+                transition={{ delay: 0.3 + i * 0.14 }}
+              >
+                {inView ? <CountNumber to={job.match} suffix="%" duration={1600} /> : '—'}
+              </motion.div>
+              <div className="job-card__title">{job.title}</div>
+              <div className="job-card__company">{job.company}</div>
+              <div className="job-card__location">📍 {job.location}</div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   EXPLAINABLE AI
+   ═══════════════════════════════════════════════════════════════════════════ */
+function XAISection() {
+  const ref    = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-80px 0px' });
+
+  return (
+    <section className="xai-section section" id="xai-section">
+      <div className="container">
+        <Reveal>
+          <div className="section__tag">Explainable AI · SHAP + LIME</div>
+          <h2 className="section__title">Why did you get <span className="anim-gradient-text">this score?</span></h2>
+          <p className="section__subtitle">
+            Every prediction is explained with SHAP values and LIME — so you always
+            know what to celebrate and what to improve.
+          </p>
+        </Reveal>
+
+        <div ref={ref} className="xai-grid">
+          <div>
+            <div className="xai-column__title xai-column--pos">✓ Working in Your Favour</div>
+            {XAI_POS.map((item, i) => (
+              <motion.div key={item} className="xai-item"
+                initial={{ opacity: 0, x: -24 }}
+                animate={inView ? { opacity: 1, x: 0 } : {}}
+                transition={{ duration: 0.45, delay: i * 0.1 }}
+                whileHover={{ x: 6, color: 'var(--text-strong)' }}>
+                <span className="xai-item__prefix--pos">+</span>{item}
+              </motion.div>
+            ))}
+          </div>
+          <div>
+            <div className="xai-column__title xai-column--neg">↑ Areas to Improve</div>
+            {XAI_NEG.map((item, i) => (
+              <motion.div key={item} className="xai-item"
+                initial={{ opacity: 0, x: 24 }}
+                animate={inView ? { opacity: 1, x: 0 } : {}}
+                transition={{ duration: 0.45, delay: i * 0.1 }}
+                whileHover={{ x: -6, color: 'var(--text-strong)' }}>
+                <span className="xai-item__prefix--neg">−</span>{item}
+              </motion.div>
             ))}
           </div>
         </div>
-      </section>
+      </div>
+    </section>
+  );
+}
 
-      {/* ── XAI SECTION ───────────────────────────────────────────────── */}
-      <section className="section section--alt" id="xai">
-        <div className="container">
-          <div className="xai-layout">
-            <div className="xai__left">
-              <div className="section__tag">Explainability First</div>
-              <h2 className="section__title">We Don't Just Predict —<br /><span className="gradient-text">We Explain</span></h2>
-              <p className="xai__body">
-                Most career tools are black boxes. CareerTwin AI is different. Every single
-                prediction is accompanied by a human-readable explanation, so you always
-                know <em>what</em> influenced your score and <em>exactly</em> what to do next.
-              </p>
-              <div className="xai__items">
-                {XAI_ITEMS.map((x) => (
-                  <div key={x.label} className="xai__item">
-                    <span className="xai__item-icon">{x.icon}</span>
-                    <div>
-                      <div className="xai__item-label">{x.label}</div>
-                      <div className="xai__item-desc">{x.desc}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="xai__right">
-              {/* XAI Visual — SHAP-style bar chart */}
-              <div className="xai-card">
-                <div className="xai-card__header">
-                  <span>🧠 SHAP Feature Importance</span>
-                  <span className="xai-card__badge">Explainability Report</span>
-                </div>
-                {[
-                  { feat: 'Python Proficiency',     val: 0.31, positive: true  },
-                  { feat: 'ML Project Experience',  val: 0.24, positive: true  },
-                  { feat: 'Missing: Deep Learning', val: 0.19, positive: false },
-                  { feat: 'SQL Skills',             val: 0.14, positive: true  },
-                  { feat: 'Missing: Cloud (AWS)',   val: 0.08, positive: false },
-                  { feat: 'Communication Score',    val: 0.04, positive: true  },
-                ].map((row) => (
-                  <div key={row.feat} className="shap-row">
-                    <span className="shap-row__label">{row.feat}</span>
-                    <div className="shap-row__bar-wrap">
-                      <div
-                        className={`shap-row__bar ${row.positive ? 'shap-row__bar--pos' : 'shap-row__bar--neg'}`}
-                        style={{ width: `${row.val * 260}px` }}
-                      />
-                    </div>
-                    <span className="shap-row__val">{row.positive ? '+' : '-'}{(row.val * 100).toFixed(0)}%</span>
-                  </div>
-                ))}
-                <div className="xai-card__footer">
-                  Positive (green) = boosting your score &nbsp;|&nbsp; Negative (red) = gaps to close
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+/* ═══════════════════════════════════════════════════════════════════════════
+   ROADMAP
+   ═══════════════════════════════════════════════════════════════════════════ */
+function RoadmapSection() {
+  const { isAuthenticated } = useAuth();
+  const ref    = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-80px 0px' });
 
+  const roadmapUrl = isAuthenticated ? '/roadmap' : '/register?redirect=%2Froadmap';
 
-      {/* ── CTA ───────────────────────────────────────────────────────── */}
-      <section className="cta-section" id="cta">
-        <div className="cta-section__blob cta-section__blob--1" />
-        <div className="cta-section__blob cta-section__blob--2" />
-        <div className="container">
-          <div className="cta-content">
-            <div className="cta-content__tag">🚀 AI-Powered Career Intelligence</div>
-            <h2 className="cta-content__title">
-              Ready to Discover Your<br />
-              <span className="gradient-text">Career Readiness Score?</span>
-            </h2>
-            <p className="cta-content__sub">
-              Create your profile, take the AI assessment, and get a detailed, explainable report
-              on your career readiness, skill gaps, and best-fit jobs — all in minutes.
+  return (
+    <section className="roadmap-section" id="roadmap-section">
+      <div className="container">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'start' }}>
+          <Reveal>
+            <div className="section__tag">Learning Roadmap</div>
+            <h2 className="section__title">Your path to <span className="anim-gradient-text">Data Scientist.</span></h2>
+            <p className="section__subtitle">
+              CareerTwin AI generates a personalised month-by-month plan from your current
+              skill level to your target role. No guesswork — just a clear path forward.
             </p>
-            <div className="cta-content__actions">
-              <Link to="/register" id="cta-register-btn" className="btn-hero btn-hero--primary">
-                🚀 Start Free Assessment
-              </Link>
-              <Link to="/dashboard" id="cta-demo-btn" className="btn-hero btn-hero--ghost">
-                👁️ View Live Demo
-              </Link>
+            <div style={{ marginTop: 28 }}>
+              <Link to={roadmapUrl} className="btn btn--primary">View Full Roadmap →</Link>
             </div>
+          </Reveal>
+
+          <div ref={ref} className="roadmap-list">
+            {ROADMAP_STEPS.map((step, i) => (
+              <motion.div
+                key={step.num}
+                className="roadmap-step"
+                initial={{ opacity: 0, x: 30 }}
+                animate={inView ? { opacity: 1, x: 0 } : {}}
+                transition={{ duration: 0.55, delay: i * 0.12 }}
+                whileHover={{ x: 4 }}
+              >
+                <motion.div
+                  className="roadmap-step__num"
+                  animate={inView ? { boxShadow: ['0 0 0px rgba(16,185,129,0)', '0 0 16px rgba(16,185,129,0.5)', '0 0 0px rgba(16,185,129,0)'] } : {}}
+                  transition={{ duration: 2.5, delay: i * 0.3, repeat: Infinity }}
+                >
+                  {step.num}
+                </motion.div>
+                <div className="roadmap-step__body">
+                  <div className="roadmap-step__title">{step.title}</div>
+                  <div className="roadmap-step__desc">{step.desc}</div>
+                </div>
+              </motion.div>
+            ))}
           </div>
         </div>
-      </section>
+      </div>
+    </section>
+  );
+}
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   CAREER ASSISTANT — animated chat with typing effect
+   ═══════════════════════════════════════════════════════════════════════════ */
+function AssistantSection() {
+  const { isAuthenticated } = useAuth();
+  const AI_REPLY = 'Based on your profile, focus next on advanced SQL, machine learning model evaluation, and cloud fundamentals (AWS or GCP).';
+  const { displayed: aiText, done: aiDone } = useTypewriter({ text: AI_REPLY, speed: 26, startDelay: 1200 });
+  const ref    = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-80px 0px' });
+  const [visible, setVisible] = useState(false);
+  useEffect(() => { if (inView) setVisible(true); }, [inView]);
+
+  const assistantUrl = isAuthenticated ? '/assistant' : '/register?redirect=%2Fassistant';
+
+  return (
+    <section className="assistant-section section" id="assistant-section">
+      <div className="container">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'center' }}>
+          <Reveal>
+            <div className="section__tag">AI Career Assistant</div>
+            <h2 className="section__title">Ask anything.<br /><span className="anim-gradient-text">Get clarity.</span></h2>
+            <p className="section__subtitle">
+              Our RAG-powered career assistant understands your profile and gives personalised,
+              context-aware career guidance — available 24/7.
+            </p>
+            <div style={{ marginTop: 28 }}>
+              <Link to={assistantUrl} className="btn btn--primary">Open Assistant →</Link>
+            </div>
+          </Reveal>
+
+          <motion.div ref={ref} className="chat-window"
+            initial={{ opacity: 0, y: 28, rotateX: 4 }}
+            animate={inView ? { opacity: 1, y: 0, rotateX: 0 } : {}}
+            transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}>
+            <div className="chat-header">
+              <div className="chat-dot glow-dot" />
+              <div className="chat-header__title">CareerTwin AI Assistant</div>
+              <div style={{ marginLeft: 'auto', fontSize: '.7rem', color: 'var(--emerald-light)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--emerald-light)', display: 'inline-block', animation: 'glowPulse 2s infinite' }} />
+                Online
+              </div>
+            </div>
+            <div className="chat-messages">
+              <motion.div className="chat-bubble chat-bubble--user"
+                initial={{ opacity: 0, y: 10, x: 20 }}
+                animate={inView ? { opacity: 1, y: 0, x: 0 } : {}}
+                transition={{ delay: 0.4 }}>
+                What should I learn to become a Data Scientist?
+              </motion.div>
+              <motion.div className="chat-bubble chat-bubble--ai"
+                initial={{ opacity: 0, y: 10, x: -20 }}
+                animate={inView ? { opacity: 1, y: 0, x: 0 } : {}}
+                transition={{ delay: 0.9 }}>
+                {visible ? (
+                  <>
+                    {aiText}
+                    {!aiDone && <span className="animate-blink" style={{ marginLeft: 2, opacity: 0.8 }}>▋</span>}
+                  </>
+                ) : '…'}
+              </motion.div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOCK INTERVIEW
+   ═══════════════════════════════════════════════════════════════════════════ */
+function MockInterviewSection() {
+  const { isAuthenticated } = useAuth();
+  const interviewUrl = isAuthenticated ? '/mock-interview' : '/register?redirect=%2Fmock-interview';
+
+  return (
+    <section className="interview-section section--alt section" id="interview-section">
+      <div className="container">
+        <Reveal>
+          <div className="section__tag">AI Mock Interview</div>
+          <h2 className="section__title" style={{ marginBottom: 40 }}>
+            Practice until <span className="anim-gradient-text">you're confident.</span>
+          </h2>
+        </Reveal>
+
+        <Reveal delay={0.15}>
+          <motion.div className="interview-card shimmer-card"
+            whileHover={{ y: -5, boxShadow: '0 12px 60px rgba(0,0,0,0.5), 0 0 40px rgba(16,185,129,0.2)' }}
+            transition={{ duration: 0.3 }}>
+            <div className="interview-q-label">Sample Interview Question</div>
+            <p className="interview-question">
+              "Explain the difference between supervised and unsupervised learning."
+            </p>
+            <Link to={interviewUrl} className="btn btn--primary" id="interview-start-btn">
+              Start Mock Interview <span className="btn__arrow">→</span>
+            </Link>
+          </motion.div>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FINAL CTA
+   ═══════════════════════════════════════════════════════════════════════════ */
+function FinalCTA() {
+  const { isAuthenticated } = useAuth();
+  const ctaUrl = isAuthenticated ? '/dashboard' : '/register?redirect=%2Fdashboard';
+
+  return (
+    <Reveal>
+      <section className="final-cta" id="final-cta">
+        <div className="container">
+          <motion.p
+            className="final-cta__heading"
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.65 }}
+          >
+            Your career has a direction.<br />
+            <span className="anim-gradient-text">Let's make it clearer.</span>
+          </motion.p>
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.2 }}
+          >
+            <Link to={ctaUrl} className="btn btn--primary" id="final-cta-btn" style={{ fontSize: '1rem', padding: '16px 36px' }}>
+              Start Your Career Assessment <span className="btn__arrow">→</span>
+            </Link>
+          </motion.div>
+        </div>
+      </section>
+    </Reveal>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HOME PAGE — COMPOSED
+   ═══════════════════════════════════════════════════════════════════════════ */
+function Home() {
+  return (
+    <div id="page-home" style={{ background: 'var(--bg)', position: 'relative' }}>
+      {/* Persistent Full-Page Background Shining Spots */}
+      <PersistentShiningDots count={60} />
+      <HeroSection />
+      <PillsSection />
+      <ReadinessSection />
+      <JobMatchSection />
+      <XAISection />
+      <RoadmapSection />
+      <AssistantSection />
+      <MockInterviewSection />
+      <FinalCTA />
     </div>
   );
 }

@@ -13,6 +13,8 @@
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
+import { AuthProvider } from './contexts/AuthContext';
+
 // Layouts
 import PublicLayout    from './layouts/PublicLayout';
 import DashboardLayout from './layouts/DashboardLayout';
@@ -53,53 +55,55 @@ import CareerDetail    from './pages/CareerDetail';
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
 
-        {/* ── Public routes ─────────────────────────────────── */}
-        <Route element={<PublicLayout />}>
-          <Route path="/"             element={<Home />}         />
-          <Route path="/about"        element={<About />}        />
-          <Route path="/how-it-works" element={<HowItWorks />}  />
-          <Route path="/careers"      element={<Careers />}      />
-          <Route path="/careers/:slug" element={<CareerDetail />} />
-          <Route path="/login"        element={<Login />}        />
-          <Route path="/register"     element={<Register />}     />
-        </Route>
+          {/* ── Public routes ─────────────────────────────────── */}
+          <Route element={<PublicLayout />}>
+            <Route path="/"             element={<Home />}         />
+            <Route path="/about"        element={<About />}        />
+            <Route path="/how-it-works" element={<HowItWorks />}  />
+            <Route path="/careers"      element={<Careers />}      />
+            <Route path="/careers/:slug" element={<CareerDetail />} />
+            <Route path="/login"        element={<Login />}        />
+            <Route path="/register"     element={<Register />}     />
+          </Route>
 
-        {/* ── Student / Dashboard routes ─────────────────────── */}
-        <Route element={<DashboardLayout />}>
-          <Route path="/dashboard"        element={<Dashboard />}       />
-          <Route path="/profile"          element={<Profile />}         />
-          <Route path="/resume-analyzer"  element={<ResumeAnalyzer />}  />
-          <Route path="/ats-score"        element={<AtsScore />}        />
-          <Route path="/assessment"       element={<Assessment />}      />
-          <Route path="/career-readiness" element={<CareerReadiness />} />
-          <Route path="/skill-gap"        element={<SkillGap />}        />
-          <Route path="/job-matches"      element={<JobMatches />}      />
-          <Route path="/explainable-ai"   element={<ExplainableAI />}   />
-          <Route path="/assistant"        element={<CareerAssistant />} />
-          <Route path="/roadmap"          element={<LearningRoadmap />} />
-          <Route path="/github-analyzer"  element={<GitHubAnalyzer />}  />
-          <Route path="/mock-interview"   element={<MockInterview />}   />
-          <Route path="/reports"          element={<Reports />}         />
-        </Route>
+          {/* ── Student / Dashboard routes ─────────────────────── */}
+          <Route element={<DashboardLayout />}>
+            <Route path="/dashboard"        element={<Dashboard />}       />
+            <Route path="/profile"          element={<Profile />}         />
+            <Route path="/resume-analyzer"  element={<ResumeAnalyzer />}  />
+            <Route path="/ats-score"        element={<AtsScore />}        />
+            <Route path="/assessment"       element={<Assessment />}      />
+            <Route path="/career-readiness" element={<CareerReadiness />} />
+            <Route path="/skill-gap"        element={<SkillGap />}        />
+            <Route path="/job-matches"      element={<JobMatches />}      />
+            <Route path="/explainable-ai"   element={<ExplainableAI />}   />
+            <Route path="/assistant"        element={<CareerAssistant />} />
+            <Route path="/roadmap"          element={<LearningRoadmap />} />
+            <Route path="/github-analyzer"  element={<GitHubAnalyzer />}  />
+            <Route path="/mock-interview"   element={<MockInterview />}   />
+            <Route path="/reports"          element={<Reports />}         />
+          </Route>
 
-        {/* ── Admin routes ──────────────────────────────────── */}
-        <Route element={<AdminLayout />}>
-          <Route path="/admin"            element={<AdminDashboard />} />
-          <Route path="/admin/users"      element={<AdminUsers />}     />
-          <Route path="/admin/jobs"       element={<AdminJobs />}      />
-          <Route path="/admin/skills"     element={<AdminSkills />}     />
-          <Route path="/admin/roles"      element={<AdminRoles />}     />
-          <Route path="/admin/analytics"  element={<AdminAnalytics />} />
-        </Route>
+          {/* ── Admin routes ──────────────────────────────────── */}
+          <Route element={<AdminLayout />}>
+            <Route path="/admin"            element={<AdminDashboard />} />
+            <Route path="/admin/users"      element={<AdminUsers />}     />
+            <Route path="/admin/jobs"       element={<AdminJobs />}      />
+            <Route path="/admin/skills"     element={<AdminSkills />}     />
+            <Route path="/admin/roles"      element={<AdminRoles />}     />
+            <Route path="/admin/analytics"  element={<AdminAnalytics />} />
+          </Route>
 
-        {/* ── Fallback — redirect unknown paths to home ─────── */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+          {/* ── Fallback — redirect unknown paths to home ─────── */}
+          <Route path="*" element={<Navigate to="/" replace />} />
 
-      </Routes>
-    </BrowserRouter>
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 

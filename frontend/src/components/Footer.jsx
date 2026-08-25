@@ -1,26 +1,28 @@
 /**
- * Footer.jsx — Professional site-wide footer
+ * Footer.jsx — CareerTwin AI Clean Minimal Footer
  */
 
-import { Link } from 'react-router-dom';
-
 function Footer() {
-  const year = new Date().getFullYear();
-
   return (
     <footer className="footer">
-      <div className="footer__inner footer__inner--centered">
-        {/* Brand */}
-        <Link to="/" className="footer__logo">
-          <span className="footer__logo-icon">⚡</span> CareerTwin <span className="footer__logo-ai">AI</span>
-        </Link>
-      </div>
+      <div className="container">
+        <div className="footer__brand-wrap">
+          <div className="footer__brand">
+            <span style={{ color: 'var(--emerald-light)' }}>◈</span>
+            CareerTwin AI
+          </div>
+          <p className="footer__tagline">
+            An Explainable Machine Learning-Based Career Readiness,
+            Skill Gap and Job Matching System.
+          </p>
+        </div>
 
-      {/* Bottom bar */}
-      <div className="footer__bottom">
-        <span>&copy; {new Date().getFullYear()} CareerTwin AI. All rights reserved.</span>
+        {/* Bottom bar */}
+        <div className="footer__bottom">
+          <span>© {new Date().getFullYear()} CareerTwin AI. All rights reserved.</span>
+          <span>Built as a BCA Data Science Academic Project</span>
+        </div>
       </div>
-
     </footer>
   );
 }
