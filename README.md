@@ -104,7 +104,28 @@ CareerTwin-AI/
 
 ## Getting Started
 
-> Setup instructions will be added once the development phase begins.
+### 1. Backend Setup (FastAPI + SQLite)
+
+```bash
+cd backend
+python -m venv venv
+.\venv\Scripts\activate   # On Windows
+pip install -r requirements.txt
+copy .env.example .env
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+- API Server: [http://127.0.0.1:8000](http://127.0.0.1:8000)
+- Interactive Docs: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- Automated Tests: `pytest -v`
+
+### 2. Frontend Setup (React + Vite)
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+- Client Application: [http://localhost:5173](http://localhost:5173)
 
 ---
 

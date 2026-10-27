@@ -1,0 +1,31 @@
+{
+  "model_name": "CareerReadinessRandomForest",
+  "model_version": "rf_v1.0",
+  "algorithm": "RandomForest Ensemble (Classifier + Regressor)",
+  "supported_roles": [
+    "Data Analyst",
+    "Python Developer",
+    "Machine Learning Engineer"
+  ],
+  "features": [
+    "core_coverage",
+    "core_avg_proficiency",
+    "secondary_coverage",
+    "total_skills_count",
+    "experience_normalized",
+    "degree_score",
+    "has_github",
+    "has_linkedin",
+    "role_code"
+  ],
+  "metrics": {
+    "accuracy": 0.8528,
+    "macro_f1": 0.686,
+    "r2_score": 0.88,
+    "mae": 2.7,
+    "train_samples": 1440,
+    "test_samples": 360
+  },
+  "dataset_description": "Reproducible synthetic benchmark dataset (N=1,800) generated with deterministic distribution parameters simulating entry-level student skill profiles, academic backgrounds, and experience tiers.",
+  "disclaimer": "The model provides a baseline educational estimate of career readiness for entry-level roles. It does not represent actual hiring outcomes, commercial applicant tracking rankings, or interview guarantees."
+}

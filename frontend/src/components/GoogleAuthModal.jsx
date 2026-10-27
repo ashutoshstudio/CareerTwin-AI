@@ -1,15 +1,14 @@
 /**
- * GoogleAuthModal.jsx — Verified Google OAuth Authentication Modal
- * Theme: Frosted Crystal Glass & Google OAuth security (Light Mode)
- * Enforces that only verified Google accounts (@gmail.com) are accepted.
+ * GoogleAuthModal.jsx — Google OAuth Notice Modal
+ * Informs the user when Google OAuth credentials are not configured in the environment,
+ * and provides clear guidance and immediate navigation to the working email/password flow.
  */
 
-import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, ShieldCheck, AlertCircle, X, ArrowRight } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { X, Mail, ShieldAlert, ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
-function GoogleIcon({ size = 22 }) {
+function GoogleIcon({ size = 24 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
       <path
@@ -32,76 +31,7 @@ function GoogleIcon({ size = 22 }) {
   );
 }
 
-export function GoogleAuthModal({ isOpen, onClose, onSuccess }) {
-  const { loginWithGoogle } = useAuth();
-  const [googleEmail, setGoogleEmail] = useState('');
-  const [googleName, setGoogleName]   = useState('');
-  const [error, setError]             = useState('');
-  const [verifying, setVerifying]     = useState(false);
-
-  const PRESET_ACCOUNTS = [
-    {
-      name: 'Neeraj Singh Gaira',
-      email: 'neeraj.singh.gaira@gmail.com',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&h=80&fit=crop&crop=faces',
-    },
-    {
-      name: 'Roshan Mazhi',
-      email: 'roshan.mazhi@gmail.com',
-      avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=80&h=80&fit=crop&crop=faces',
-    },
-    {
-      name: 'Ashutosh Kumar Singh',
-      email: 'ashutosh.kumar.singh@gmail.com',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&crop=faces',
-    },
-  ];
-
-  const handleSelectAccount = (acc) => {
-    setVerifying(true);
-    setError('');
-    setTimeout(() => {
-      const res = loginWithGoogle(acc);
-      if (res.success) {
-        onSuccess?.(res.user);
-      } else {
-        setError(res.error || 'Google verification failed.');
-        setVerifying(false);
-      }
-    }, 700);
-  };
-
-  const handleCustomGoogleSubmit = (e) => {
-    e.preventDefault();
-    setError('');
-
-    const email = googleEmail.trim().toLowerCase();
-    if (!email) {
-      setError('Please enter your Google account email.');
-      return;
-    }
-
-    if (!email.endsWith('@gmail.com') && !email.endsWith('@googlemail.com')) {
-      setError('Only verified Google accounts ending in @gmail.com are accepted.');
-      return;
-    }
-
-    setVerifying(true);
-    setTimeout(() => {
-      const res = loginWithGoogle({
-        name: googleName.trim() || email.split('@')[0],
-        email: email,
-      });
-
-      if (res.success) {
-        onSuccess?.(res.user);
-      } else {
-        setError(res.error || 'Google verification failed.');
-        setVerifying(false);
-      }
-    }, 700);
-  };
-
+export function GoogleAuthModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
@@ -111,7 +41,7 @@ export function GoogleAuthModal({ isOpen, onClose, onSuccess }) {
           position: 'fixed',
           inset: 0,
           zIndex: 9999,
-          background: 'rgba(15, 23, 42, 0.45)',
+          background: 'rgba(15, 23, 42, 0.55)',
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
           display: 'flex',
@@ -122,10 +52,10 @@ export function GoogleAuthModal({ isOpen, onClose, onSuccess }) {
         onClick={onClose}
       >
         <motion.div
-          initial={{ opacity: 0, scale: 0.92, y: 20 }}
+          initial={{ opacity: 0, scale: 0.94, y: 16 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.92, y: 20 }}
-          transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+          exit={{ opacity: 0, scale: 0.94, y: 16 }}
+          transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
           style={{
             background: '#ffffff',
             border: '1px solid rgba(16, 185, 129, 0.3)',
@@ -133,7 +63,7 @@ export function GoogleAuthModal({ isOpen, onClose, onSuccess }) {
             padding: '32px 30px',
             maxWidth: 440,
             width: '100%',
-            boxShadow: '0 24px 60px rgba(15, 23, 42, 0.15), 0 0 40px rgba(16, 185, 129, 0.12)',
+            boxShadow: '0 24px 60px rgba(15, 23, 42, 0.15), 0 0 40px rgba(16, 185, 129, 0.1)',
             position: 'relative',
           }}
           onClick={(e) => e.stopPropagation()}
@@ -155,186 +85,123 @@ export function GoogleAuthModal({ isOpen, onClose, onSuccess }) {
               justifyContent: 'center',
               color: 'var(--text-muted)',
               cursor: 'pointer',
+              transition: 'background 0.2s',
             }}
+            aria-label="Close modal"
           >
             <X size={16} />
           </button>
 
           {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
-            <GoogleIcon size={28} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 14,
+                background: 'rgba(15, 23, 42, 0.04)',
+                border: '1px solid rgba(15, 23, 42, 0.08)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <GoogleIcon size={24} />
+            </div>
             <div>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-strong)', margin: 0 }}>
-                Sign in with Google
+                Google Sign-In
               </h2>
               <p style={{ fontSize: '.8rem', color: 'var(--text-muted)', margin: 0 }}>
-                Choose an account to continue
+                OAuth 2.0 Status Notice
               </p>
             </div>
           </div>
 
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '8px 12px',
-            background: 'rgba(16, 185, 129, 0.08)',
-            border: '1px solid rgba(16, 185, 129, 0.2)',
-            borderRadius: 10,
-            fontSize: '.78rem',
-            color: 'var(--emerald)',
-            fontWeight: 600,
-            marginBottom: 20,
-          }}>
-            <ShieldCheck size={16} style={{ flexShrink: 0 }} />
-            <span>Fast, secure single sign-on with your Google Account.</span>
-          </div>
-
-          {error && (
-            <div style={{
-              background: 'rgba(239, 68, 68, 0.08)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              borderRadius: 10,
-              padding: '10px 14px',
-              fontSize: '.8rem',
-              color: '#dc2626',
-              marginBottom: 16,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}>
-              <AlertCircle size={15} style={{ flexShrink: 0 }} />
-              <span>{error}</span>
+          {/* Status Box */}
+          <div
+            style={{
+              background: 'rgba(245, 158, 11, 0.08)',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
+              borderRadius: 14,
+              padding: '16px',
+              marginBottom: 20,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#b45309', fontWeight: 700, fontSize: '.86rem', marginBottom: 6 }}>
+              <ShieldAlert size={17} style={{ flexShrink: 0 }} />
+              <span>OAuth Not Configured in Development</span>
             </div>
-          )}
-
-          {/* Quick Accounts */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-            {PRESET_ACCOUNTS.map((acc) => (
-              <motion.button
-                key={acc.email}
-                type="button"
-                onClick={() => handleSelectAccount(acc)}
-                disabled={verifying}
-                whileHover={{ scale: 1.02, x: 2 }}
-                whileTap={{ scale: 0.98 }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '12px 14px',
-                  background: 'rgba(15, 23, 42, 0.03)',
-                  border: '1px solid rgba(15, 23, 42, 0.08)',
-                  borderRadius: 14,
-                  cursor: verifying ? 'wait' : 'pointer',
-                  textAlign: 'left',
-                  width: '100%',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(16, 185, 129, 0.08)';
-                  e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.35)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(15, 23, 42, 0.03)';
-                  e.currentTarget.style.borderColor = 'rgba(15, 23, 42, 0.08)';
-                }}
-              >
-                <img
-                  src={acc.avatar}
-                  alt={acc.name}
-                  style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }}
-                />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '.88rem', fontWeight: 700, color: 'var(--text-strong)' }}>
-                    {acc.name}
-                  </div>
-                  <div style={{ fontSize: '.76rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {acc.email}
-                  </div>
-                </div>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  fontSize: '.72rem',
-                  fontWeight: 700,
-                  color: 'var(--emerald)',
-                  background: 'rgba(16, 185, 129, 0.15)',
-                  padding: '3px 8px',
-                  borderRadius: 99,
-                }}>
-                  <CheckCircle2 size={12} /> Active
-                </div>
-              </motion.button>
-            ))}
+            <p style={{ fontSize: '.82rem', color: 'var(--text)', lineHeight: 1.5, margin: 0 }}>
+              Google OAuth authentication requires production credentials (Google Cloud Client ID & Secret).
+              In this local development environment, please use standard <strong>Email & Password</strong> authentication.
+            </p>
           </div>
 
-          {/* Or enter your own Gmail */}
-          <div style={{ borderTop: '1px solid rgba(15, 23, 42, 0.08)', paddingTop: 16 }}>
-            <p style={{ fontSize: '.78rem', color: 'var(--text-muted)', marginBottom: 12, fontWeight: 700 }}>
-              Or use your Google email:
-            </p>
-            <form onSubmit={handleCustomGoogleSubmit}>
-              <div style={{ marginBottom: 10 }}>
-                <input
-                  type="text"
-                  placeholder="Your Name (optional)"
-                  value={googleName}
-                  onChange={(e) => setGoogleName(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    borderRadius: 10,
-                    border: '1px solid rgba(15, 23, 42, 0.12)',
-                    background: '#f8fafc',
-                    color: 'var(--text-strong)',
-                    fontSize: '.85rem',
-                    outline: 'none',
-                    marginBottom: 8,
-                  }}
-                />
-                <input
-                  type="email"
-                  placeholder="you@gmail.com"
-                  value={googleEmail}
-                  onChange={(e) => { setGoogleEmail(e.target.value); setError(''); }}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    borderRadius: 10,
-                    border: '1px solid rgba(15, 23, 42, 0.12)',
-                    background: '#f8fafc',
-                    color: 'var(--text-strong)',
-                    fontSize: '.85rem',
-                    outline: 'none',
-                  }}
-                />
+          {/* Working Alternative */}
+          <div style={{ marginBottom: 24 }}>
+            <h3 style={{ fontSize: '.85rem', fontWeight: 700, color: 'var(--text-strong)', marginBottom: 8 }}>
+              Working Alternative:
+            </h3>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 10,
+                padding: '12px 14px',
+                background: 'rgba(16, 185, 129, 0.08)',
+                border: '1px solid rgba(16, 185, 129, 0.25)',
+                borderRadius: 12,
+                fontSize: '.82rem',
+                color: 'var(--text)',
+                lineHeight: 1.5,
+              }}
+            >
+              <Mail size={16} style={{ color: 'var(--emerald)', flexShrink: 0, marginTop: 2 }} />
+              <div>
+                Full email registration and login is active and connected to the <strong>FastAPI backend with SQLite</strong>.
               </div>
-              <button
-                type="submit"
-                disabled={verifying}
-                style={{
-                  width: '100%',
-                  padding: '11px',
-                  borderRadius: 99,
-                  border: 'none',
-                  background: 'var(--grad-emerald)',
-                  color: '#ffffff',
-                  fontSize: '.88rem',
-                  fontWeight: 800,
-                  cursor: verifying ? 'wait' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                  boxShadow: '0 4px 16px rgba(16, 185, 129, 0.3)',
-                }}
-              >
-                {verifying ? 'Signing in…' : 'Continue'} <ArrowRight size={15} />
-              </button>
-            </form>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn btn--primary"
+              style={{
+                width: '100%',
+                padding: '12px 20px',
+                fontSize: '.9rem',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+              }}
+            >
+              Continue with Email & Password <ArrowRight size={16} />
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                width: '100%',
+                padding: '10px 16px',
+                background: 'transparent',
+                border: '1px solid rgba(15, 23, 42, 0.12)',
+                borderRadius: 12,
+                fontSize: '.82rem',
+                fontWeight: 600,
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
           </div>
         </motion.div>
       </div>

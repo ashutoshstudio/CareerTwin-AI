@@ -67,7 +67,9 @@ function Login() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setGlobalError(null);
     setAccountNotFound(false);
@@ -78,20 +80,24 @@ function Login() {
       return;
     }
 
-    const res = login({ email, password });
-    if (!res.success) {
-      setShaking(true);
-      setTimeout(() => setShaking(false), 500);
-      if (res.notFound) {
-        setAccountNotFound(true);
-        setGlobalError('No verified account found with this email. You need to create an account first.');
-      } else {
-        setGlobalError(res.error || 'Authentication failed. Please check your credentials.');
+    setLoading(true);
+    try {
+      const res = await login({ email, password });
+      if (!res.success) {
+        setShaking(true);
+        setTimeout(() => setShaking(false), 500);
+        if (res.unauthorized) {
+          setGlobalError('Incorrect email or password. Please verify your credentials.');
+        } else {
+          setGlobalError(res.error || 'Authentication failed. Please check your credentials.');
+        }
+        return;
       }
-      return;
-    }
 
-    navigate(redirectUrl, { replace: true });
+      navigate(redirectUrl, { replace: true });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGoogleSuccess = () => {
@@ -368,11 +374,13 @@ function Login() {
             type="submit"
             className="form-submit"
             id="login-submit-btn"
+            disabled={loading}
             style={{
               padding: '14px',
               fontSize: '.95rem',
               fontWeight: 800,
-              cursor: 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.7 : 1,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -380,7 +388,7 @@ function Login() {
               marginBottom: 20,
             }}
           >
-            Sign In <span className="btn__arrow">→</span>
+            {loading ? 'Signing In...' : <>Sign In <span className="btn__arrow">→</span></>}
           </button>
         </form>
 

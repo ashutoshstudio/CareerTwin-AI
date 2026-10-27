@@ -101,7 +101,7 @@ function Register() {
     setStep('verify_otp');
   };
 
-  const handleVerifyAndRegister = (e) => {
+  const handleVerifyAndRegister = async (e) => {
     e.preventDefault();
     setOtpError('');
 
@@ -111,8 +111,8 @@ function Register() {
     }
 
     setVerifyingOtp(true);
-    setTimeout(() => {
-      const res = register({ name, email, password });
+    try {
+      const res = await register({ name, email, password });
       if (!res.success) {
         setVerifyingOtp(false);
         setStep('form');
@@ -126,7 +126,12 @@ function Register() {
       }
 
       navigate(redirectUrl, { replace: true });
-    }, 600);
+    } catch (err) {
+      setVerifyingOtp(false);
+      setGlobalError(err.message || 'Registration failed.');
+    } finally {
+      setVerifyingOtp(false);
+    }
   };
 
   const handleGoogleSuccess = () => {
@@ -546,10 +551,10 @@ function Register() {
               <ShieldCheck size={18} /> Security Verification
             </div>
             <h2 style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--text-strong)', marginBottom: 6 }}>
-              Verify your email
+              Complete Registration
             </h2>
             <p style={{ fontSize: '.88rem', color: 'var(--text-muted)', marginBottom: 18, lineHeight: 1.5 }}>
-              We sent a 6-digit verification code to <strong style={{ color: 'var(--text-strong)' }}>{email}</strong>
+              Enter the security verification code below to confirm and activate your student account for <strong style={{ color: 'var(--text-strong)' }}>{email}</strong>
             </p>
 
             {/* Instant Demo Code Indicator */}
