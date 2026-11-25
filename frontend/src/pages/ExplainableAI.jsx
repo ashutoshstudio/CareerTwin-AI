@@ -7,22 +7,17 @@
  *   GET  /api/v1/xai/explain
  */
 
-import React, { Component, useState, useEffect } from 'react';
+import { Component, useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Sparkles,
   TrendingUp,
   TrendingDown,
   Scale,
   ShieldAlert,
-  Info,
   CheckCircle2,
   AlertCircle,
-  RefreshCw,
-  Sliders,
-  Layers,
   BarChart3,
-  HelpCircle,
   Cpu,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -80,26 +75,23 @@ const ROLES = [
 ];
 
 function ExplainableAIContent() {
-  const { user, token } = useAuth();
+  const { token } = useAuth();
 
-  const [loading, setLoading] = useState(true);
-  const [evaluating, setEvaluating] = useState(false);
+  const [loading, setLoading] = useState(() => Boolean(token));
   const [selectedRole, setSelectedRole] = useState('Data Analyst');
   const [activeTab, setActiveTab] = useState('shap'); // 'shap', 'lime', 'global'
 
   const [explanationData, setExplanationData] = useState(null);
   const [globalData, setGlobalData] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
-  const [successMsg, setSuccessMsg] = useState(null);
 
-  const fetchExplains = async (role = selectedRole, showSpinner = true) => {
+  const fetchExplains = useCallback(async (role, showSpinner = true) => {
     if (!token) {
       setLoading(false);
       return;
     }
 
     if (showSpinner) setLoading(true);
-    else setEvaluating(true);
     setErrorMsg(null);
 
     try {
@@ -114,13 +106,37 @@ function ExplainableAIContent() {
       setErrorMsg(err.message || 'Failed to compute SHAP/LIME feature attributions.');
     } finally {
       setLoading(false);
-      setEvaluating(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
-    fetchExplains(selectedRole, true);
-  }, [token]);
+    let ignore = false;
+    if (!token) return;
+
+    async function load() {
+      try {
+        const [expRes, globRes] = await Promise.all([
+          api.getReadinessExplanation({ target_role: selectedRole, include_resume_skills: true }, token),
+          api.getGlobalXai().catch(() => null),
+        ]);
+        if (!ignore) {
+          setExplanationData(expRes);
+          if (globRes) setGlobalData(globRes);
+        }
+      } catch (err) {
+        if (!ignore) {
+          setErrorMsg(err.message || 'Failed to compute SHAP/LIME feature attributions.');
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    }
+
+    load();
+    return () => { ignore = true; };
+  }, [token, selectedRole]);
 
   const handleRoleChange = (role) => {
     setSelectedRole(role);
@@ -135,33 +151,77 @@ function ExplainableAIContent() {
     );
   }
 
+  if (!explanationData) {
+    return (
+      <div id="page-explainable-ai" className="page" style={{ maxWidth: 760, margin: '40px auto', textAlign: 'center' }}>
+        <div style={{
+          background: 'var(--bg-card, #ffffff)',
+          border: '1px solid var(--border)',
+          borderRadius: 24,
+          padding: '48px 32px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
+        }}>
+          <div style={{
+            width: 56,
+            height: 56,
+            borderRadius: 16,
+            background: 'rgba(99, 102, 241, 0.12)',
+            color: 'var(--indigo, #6366f1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 16px',
+          }}>
+            <Cpu size={30} />
+          </div>
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-strong)', marginBottom: 8 }}>
+            No Career Readiness Assessment Found
+          </h2>
+          <p style={{ fontSize: '.9rem', color: 'var(--text-sec)', maxWidth: 500, margin: '0 auto 24px', lineHeight: 1.6 }}>
+            Explainable AI uses SHAP Shapley values and LIME local surrogates to decompose your machine learning prediction. Complete your career readiness assessment first to generate mathematical attribution graphs.
+          </p>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <Link to="/career-readiness" className="btn btn--primary">
+              Assess Career Readiness
+            </Link>
+            <button onClick={() => fetchExplains(selectedRole, true)} className="btn btn--secondary">
+              Retry Calculation
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const baseValue = explanationData?.base_value || 52.6;
   const predScore = explanationData?.predicted_score || 0;
   const fidelity = explanationData?.fidelity_check;
 
   return (
-    <div id="page-explainable-ai" className="page" style={{ maxWidth: 1080, margin: '0 auto', paddingBottom: 60 }}>
+    <div id="page-explainable-ai" className="page" style={{ maxWidth: 1040, margin: '0 auto', paddingBottom: 60 }}>
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-          <div style={{
-            width: 36,
-            height: 36,
-            borderRadius: 10,
-            background: 'rgba(16, 185, 129, 0.12)',
-            display: 'flex',
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          <h1 className="page-heading" style={{ margin: 0 }}>
+            Model Explainability using SHAP & LIME
+          </h1>
+          <span style={{
+            display: 'inline-flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--emerald-light, #10b981)',
+            gap: 4,
+            padding: '2px 10px',
+            borderRadius: 99,
+            fontSize: '.72rem',
+            fontWeight: 700,
+            background: 'rgba(16, 185, 129, 0.12)',
+            color: '#059669',
+            border: '1px solid rgba(16, 185, 129, 0.28)',
           }}>
-            <Cpu size={20} />
-          </div>
-          <span style={{ fontSize: '.82rem', fontWeight: 700, color: 'var(--emerald-light, #10b981)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Explainable AI (XAI)
+            <Cpu size={12} />
+            Transparent ML
           </span>
         </div>
-        <div className="page-heading">Model Explainability using SHAP & LIME</div>
-        <div className="page-subtitle">
+        <div className="page-subtitle" style={{ margin: 0 }}>
           Transparent, mathematically rigorous feature attributions explaining why the Scikit-learn
           career readiness model produced your specific score.
         </div>
@@ -482,7 +542,7 @@ function ExplainableAIContent() {
                           background: attr.impact === 'positive' ? 'rgba(16, 185, 129, 0.12)' : attr.impact === 'negative' ? 'rgba(239, 68, 68, 0.12)' : 'var(--bg-main, #f3f4f6)',
                           color: attr.impact === 'positive' ? 'var(--emerald-light, #10b981)' : attr.impact === 'negative' ? '#f87171' : 'var(--text-muted)',
                         }}>
-                          {attr.impact.toUpperCase()}
+                          {attr.impact ? attr.impact.toUpperCase() : 'NEUTRAL'}
                         </span>
                       </td>
                     </tr>
@@ -576,26 +636,30 @@ function ExplainableAIContent() {
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {globalData?.global_importances?.map((g) => (
-              <div key={g.feature_name}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.84rem', fontWeight: 700, marginBottom: 6 }}>
-                  <span style={{ color: 'var(--text-strong)' }}>
-                    #{g.rank} {g.feature_label} ({g.category})
-                  </span>
-                  <span style={{ color: 'var(--emerald-light, #10b981)' }}>
-                    {Math.round(g.importance_score * 100)}% Gini ({g.mean_abs_shap} mean |SHAP|)
-                  </span>
+            {(globalData?.global_importances || []).map((g) => {
+              const scorePct = Math.round((g.importance_score || 0) * 100);
+              const barWidth = Math.min(100, Math.round((g.importance_score || 0) * 250));
+              return (
+                <div key={g.feature_name || g.rank}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.84rem', fontWeight: 700, marginBottom: 6 }}>
+                    <span style={{ color: 'var(--text-strong)' }}>
+                      #{g.rank} {g.feature_label} ({g.category})
+                    </span>
+                    <span style={{ color: 'var(--emerald-light, #10b981)' }}>
+                      {scorePct}% Gini ({g.mean_abs_shap ?? 0} mean |SHAP|)
+                    </span>
+                  </div>
+                  <div style={{ height: 8, background: 'var(--bg-main, #f3f4f6)', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${barWidth}%`,
+                      height: '100%',
+                      background: 'var(--emerald-light, #10b981)',
+                      borderRadius: 4,
+                    }} />
+                  </div>
                 </div>
-                <div style={{ height: 8, background: 'var(--bg-main, #f3f4f6)', borderRadius: 4, overflow: 'hidden' }}>
-                  <div style={{
-                    width: `${Math.min(100, g.importance_score * 250)}%`,
-                    height: '100%',
-                    background: 'var(--emerald-light, #10b981)',
-                    borderRadius: 4,
-                  }} />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

@@ -11,6 +11,8 @@ from app.schemas.job import (
     JobListingBase,
     JobMatchResult,
     JobMatchesResponse,
+    ProviderStatusItem,
+    ProviderStatusResponse,
     SavedJobOut,
     ToggleSaveResponse,
 )
@@ -20,33 +22,87 @@ from app.services.job_matching_service import (
     get_job_catalog,
     match_jobs_for_candidate,
 )
+from app.services.job_providers.job_provider_service import get_job_provider_service
 
 router = APIRouter()
+
+
+@router.get(
+    "/providers",
+    response_model=ProviderStatusResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get operational status and attribution requirements for all external job providers",
+)
+def get_providers_status() -> ProviderStatusResponse:
+    """Returns the operational status, attribution info, and credential state for each job provider."""
+    provider_svc = get_job_provider_service()
+    statuses = provider_svc.get_provider_statuses()
+    items = [ProviderStatusItem(**s) for s in statuses]
+    return ProviderStatusResponse(
+        providers=items,
+        total_configured=sum(1 for i in items if i.configured),
+        total_active=sum(1 for i in items if i.active),
+    )
+
+
+@router.get(
+    "/live",
+    response_model=List[JobListingBase],
+    status_code=status.HTTP_200_OK,
+    summary="Fetch live job listings directly from active external job providers",
+)
+async def get_live_jobs(
+    search: Optional[str] = Query(None, description="Search query keyword or job title"),
+    location: Optional[str] = Query(None, description="Location filter"),
+    role_category: Optional[str] = Query(None, description="Filter by technology domain or catalog role"),
+    remote_only: bool = Query(False, description="Filter remote positions only"),
+    provider: Optional[str] = Query(None, description="Filter by provider ('remotive', 'arbeitnow', 'adzuna')"),
+    limit: int = Query(30, ge=1, le=100, description="Max jobs to retrieve"),
+) -> List[JobListingBase]:
+    """Fetches live vacancies from connected external APIs with in-memory caching and deduplication."""
+    provider_svc = get_job_provider_service()
+    norm_jobs = await provider_svc.fetch_live_jobs(
+        query=search,
+        location=location,
+        role_category=role_category,
+        remote_only=remote_only,
+        provider_name=provider,
+        limit=limit,
+    )
+    return [JobListingBase(**j.to_dict()) for j in norm_jobs]
 
 
 @router.get(
     "/match",
     response_model=JobMatchesResponse,
     status_code=status.HTTP_200_OK,
-    summary="Match entry-level vacancies against current student's verified skills",
+    summary="Match live and curated vacancies against student competencies using 5-factor scoring",
 )
-def get_matched_jobs(
+async def get_matched_jobs(
+    source_type: str = Query("all", description="Source pool to match against: 'all', 'live', or 'curated'"),
     role_category: Optional[str] = Query(None, description="Filter by role category (e.g. 'Data Analyst')"),
     location_type: Optional[str] = Query(None, description="Filter by location type ('Remote', 'Hybrid', 'On-site')"),
+    remote_only: bool = Query(False, description="Filter remote positions only"),
+    job_source: Optional[str] = Query(None, description="Filter by provider ('remotive', 'arbeitnow', 'adzuna', 'curated')"),
     min_match_score: Optional[float] = Query(None, ge=0.0, le=100.0, description="Minimum match percentage threshold"),
+    sort_by: str = Query("match_score", description="Sort order: 'match_score' or 'newest'"),
+    scoring_model: str = Query("five_factor", description="Scoring formula: 'five_factor' (50/20/15/5/10) or 'standard' (70/20/10)"),
     include_resume_skills: bool = Query(True, description="Incorporate unmerged skills from latest resume"),
+    limit: int = Query(40, ge=1, le=100, description="Maximum vacancies to return"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> JobMatchesResponse:
     """
-    Ranks curated entry-level tech vacancies for the authenticated student
-    using transparent skill matching and multi-factor competency calculation.
+    Ranks vacancies against authenticated student's profile & resume competencies.
+    Supports live jobs from external APIs, curated academic benchmarks, or both.
     """
     # 1. Fetch student profile
     profile = db.query(StudentProfile).filter(StudentProfile.user_id == current_user.id).first()
     candidate_skills = list(profile.skills or []) if profile else []
     target_role = profile.target_role if profile else None
     exp_months = profile.experience_months if profile else 0
+    candidate_edu = profile.education_level if profile else None
+    candidate_deg = profile.headline if profile else None
 
     # 2. Optionally incorporate resume skills
     if include_resume_skills:
@@ -68,21 +124,47 @@ def get_matched_jobs(
     saved_records = db.query(SavedJob).filter(SavedJob.user_id == current_user.id).all()
     saved_ids = {r.job_id for r in saved_records}
 
-    # 4. Perform job matching
+    # 4. Fetch live jobs if requested (in testing, only fetch if mocked or explicitly active)
+    live_dicts: Optional[List[Dict[str, Any]]] = None
+    if source_type in {"all", "live"}:
+        from app.core.config import settings as app_settings
+        if app_settings.APP_ENV != "testing":
+            provider_svc = get_job_provider_service()
+            query_kw = target_role or (profile.headline if profile else None)
+            live_norm = await provider_svc.fetch_live_jobs(
+                query=query_kw,
+                role_category=role_category,
+                remote_only=remote_only,
+                provider_name=job_source if job_source in {"remotive", "arbeitnow", "adzuna"} else None,
+                limit=limit,
+            )
+            live_dicts = [j.to_dict() for j in live_norm]
+
+    # 5. Perform job matching
     matched_results = match_jobs_for_candidate(
         candidate_skills=candidate_skills,
         target_role=target_role,
         experience_months=exp_months,
+        candidate_education=candidate_edu,
+        candidate_degree=candidate_deg,
         role_filter=role_category,
         location_type_filter=location_type,
+        remote_only=remote_only,
+        source_filter=job_source or (source_type if source_type in {"curated", "live"} else None),
         min_match_score=min_match_score,
         saved_job_ids=saved_ids,
+        live_jobs=live_dicts,
+        scoring_model=scoring_model,
+        sort_by=sort_by,
     )
 
+    sliced = matched_results[:limit]
+
     return JobMatchesResponse(
-        total_matched=len(matched_results),
+        total_matched=len(sliced),
         candidate_skills_count=len(candidate_skills),
-        matches=[JobMatchResult(**item) for item in matched_results],
+        source_type=source_type,
+        matches=[JobMatchResult(**item) for item in sliced],
     )
 
 
@@ -148,7 +230,7 @@ def save_job(
     if not job:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Job vacancy with ID '{job_id}' not found in catalog.",
+            detail=f"Job vacancy with ID '{job_id}' not found in catalog or active cache.",
         )
 
     existing = (
@@ -231,12 +313,17 @@ def get_job_detail(
     candidate_skills = list(profile.skills or []) if profile else []
     target_role = profile.target_role if profile else None
     exp_months = profile.experience_months if profile else 0
+    candidate_edu = profile.education_level if profile else None
+    candidate_deg = profile.headline if profile else None
 
     match_res = calculate_job_match(
         job=job,
         candidate_skills=candidate_skills,
         target_role=target_role,
         experience_months=exp_months,
+        candidate_education=candidate_edu,
+        candidate_degree=candidate_deg,
+        scoring_model="five_factor",
     )
 
     is_saved = (

@@ -4,7 +4,7 @@
  * Connected to FastAPI backend: POST /api/v1/resume/analyze & GET /api/v1/resume/history
  */
 
-import React, { Component, useState, useEffect, useRef } from 'react';
+import { Component, useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   UploadCloud,
@@ -19,7 +19,6 @@ import {
   Check,
   Clock,
   Sparkles,
-  ArrowRight,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
@@ -44,7 +43,7 @@ function LinkedinIcon({ size = 16, style = {} }) {
 }
 
 function ResumeAnalyzer() {
-  const { user, token } = useAuth();
+  const { token } = useAuth();
   const fileInputRef = useRef(null);
 
   const [dragActive, setDragActive] = useState(false);
@@ -56,7 +55,6 @@ function ResumeAnalyzer() {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [syncingProfile, setSyncingProfile] = useState(false);
-  const [syncedCount, setSyncedCount] = useState(null);
 
   // Load latest analysis and history on component mount
   useEffect(() => {
@@ -154,7 +152,6 @@ function ResumeAnalyzer() {
     setAnalyzing(true);
     setErrorMsg('');
     setSuccessMsg('');
-    setSyncedCount(null);
 
     try {
       const result = await api.analyzeResume(selectedFile, token);
@@ -215,7 +212,6 @@ function ResumeAnalyzer() {
       };
 
       await api.updateProfile(payload, token);
-      setSyncedCount(newSkillsToAdd.length);
       setSuccessMsg(
         newSkillsToAdd.length > 0
           ? `Successfully synchronized ${newSkillsToAdd.length} newly extracted skill(s) to your profile!`

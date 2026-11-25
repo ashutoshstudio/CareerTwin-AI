@@ -191,7 +191,7 @@ def test_model_info_transparency_endpoint(client: TestClient):
     assert data["metrics"]["accuracy"] > 0.70
     assert data["metrics"]["r2_score"] > 0.70
     assert len(data["features"]) == 9
-    assert len(data["supported_roles"]) == 3
+    assert len(data["supported_roles"]) >= 40
     assert "disclaimer" in data
     assert "not represent actual hiring outcomes" in data["disclaimer"]
 

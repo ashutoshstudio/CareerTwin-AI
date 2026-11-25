@@ -61,7 +61,7 @@ function HowItWorks() {
 
         {/* Steps */}
         <div className="how-steps">
-          {STEPS.map((step, i) => (
+          {STEPS.map((step) => (
             <motion.div
               key={step.num}
               className="how-step"

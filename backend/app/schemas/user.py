@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
@@ -19,6 +20,7 @@ class UserLogin(BaseModel):
 class UserOut(UserBase):
     id: int
     role: str
+    auth_provider: str = "local"
     is_active: bool
     created_at: datetime
 
@@ -29,3 +31,21 @@ class AuthResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserOut
+
+
+class GoogleAuthUrlOut(BaseModel):
+    authorization_url: str
+    configured: bool = True
+
+
+class GoogleAuthStatusOut(BaseModel):
+    configured: bool
+    redirect_uri: str
+    google_client_id_present: bool = False
+    google_client_secret_present: bool = False
+    google_redirect_uri_present: bool = False
+    env_files_detected: List[str] = Field(default_factory=list)
+
+
+class GoogleTicketExchangeRequest(BaseModel):
+    ticket: str = Field(..., min_length=10, max_length=2000)

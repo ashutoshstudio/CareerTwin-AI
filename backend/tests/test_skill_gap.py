@@ -160,7 +160,7 @@ def test_role_definitions_endpoint(client: TestClient):
     assert response.status_code == 200
 
     roles = response.json()
-    assert len(roles) == 3
+    assert len(roles) >= 40
     role_names = [r["role_name"] for r in roles]
     assert "Data Analyst" in role_names
     assert "Python Developer" in role_names

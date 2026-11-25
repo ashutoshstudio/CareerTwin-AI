@@ -4,13 +4,11 @@
  * Connected to FastAPI backend: POST /api/v1/readiness/assess & GET /api/v1/readiness/latest
  */
 
-import React, { Component, useState, useEffect } from 'react';
+import { Component, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Target,
   CheckCircle2,
   AlertCircle,
-  AlertTriangle,
   RefreshCw,
   Sparkles,
   Briefcase,
@@ -24,22 +22,16 @@ import {
   Cpu,
   TrendingUp,
   TrendingDown,
-  Scale,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 import Loading from '../components/Loading';
-
-const SUPPORTED_ROLES = [
-  'Data Analyst',
-  'Python Developer',
-  'Machine Learning Engineer',
-];
+import { CATEGORIZED_ROLES } from '../data/careerPaths';
 
 function CareerReadiness() {
-  const { user, token } = useAuth();
+  const { token } = useAuth();
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => Boolean(token));
   const [assessing, setAssessing] = useState(false);
   const [selectedRole, setSelectedRole] = useState('Data Analyst');
   const [includeResumeSkills, setIncludeResumeSkills] = useState(true);
@@ -53,14 +45,10 @@ function CareerReadiness() {
   // Initial data loading
   useEffect(() => {
     let isMounted = true;
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+    if (!token) return;
 
     async function loadData() {
       try {
-        setLoading(true);
         setErrorMsg('');
 
         // 1. Fetch latest assessment
@@ -272,8 +260,12 @@ function CareerReadiness() {
               handleRunAssessment(e.target.value);
             }}
           >
-            {SUPPORTED_ROLES.map((role) => (
-              <option key={role} value={role}>{role}</option>
+            {CATEGORIZED_ROLES.map((group) => (
+              <optgroup key={group.category} label={group.category}>
+                {group.roles.map((role) => (
+                  <option key={role} value={role}>{role}</option>
+                ))}
+              </optgroup>
             ))}
           </select>
 

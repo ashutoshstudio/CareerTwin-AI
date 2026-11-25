@@ -9,6 +9,8 @@ from sqlalchemy.pool import StaticPool
 # Set testing environment variables before importing app
 os.environ["APP_ENV"] = "testing"
 os.environ["SECRET_KEY"] = "test-secret-key-for-pytest-execution-only-12345"
+os.environ["AI_PROVIDER"] = "none"
+os.environ["AI_API_KEY"] = ""
 
 from app.core.database import Base, get_db
 from app.main import app

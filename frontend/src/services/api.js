@@ -117,6 +117,26 @@ export const api = {
     });
   },
 
+  /** Initiate real Google OAuth 2.0 authorization code flow */
+  getGoogleAuthUrl: async (redirect = '/dashboard') => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173';
+    const params = new URLSearchParams({
+      redirect,
+      frontend_origin: origin,
+    });
+    return request(`/auth/google/login?${params.toString()}`, {
+      method: 'GET',
+    });
+  },
+
+  /** Exchange one-time OAuth callback ticket for CareerTwin JWT AuthResponse */
+  exchangeGoogleTicket: async (ticket) => {
+    return request('/auth/google/exchange', {
+      method: 'POST',
+      body: JSON.stringify({ ticket }),
+    });
+  },
+
   /** Get current authenticated user profile */
   getProfile: async (token) => {
     return request('/profile/me', {
@@ -305,10 +325,16 @@ export const api = {
   getJobMatches: async (params = {}, token) => {
     if (!token) return { total_matched: DEMO_JOB_MATCHES.length, matches: DEMO_JOB_MATCHES };
     const query = new URLSearchParams();
+    if (params.source_type) query.append('source_type', params.source_type);
     if (params.role_category) query.append('role_category', params.role_category);
     if (params.location_type) query.append('location_type', params.location_type);
+    if (params.remote_only !== undefined) query.append('remote_only', params.remote_only);
+    if (params.job_source) query.append('job_source', params.job_source);
     if (params.min_match_score) query.append('min_match_score', params.min_match_score);
+    if (params.sort_by) query.append('sort_by', params.sort_by);
+    if (params.scoring_model) query.append('scoring_model', params.scoring_model);
     if (params.include_resume_skills !== undefined) query.append('include_resume_skills', params.include_resume_skills);
+    if (params.limit) query.append('limit', params.limit);
 
     const qs = query.toString() ? `?${query.toString()}` : '';
     return request(`/jobs/match${qs}`, {
@@ -316,6 +342,25 @@ export const api = {
         Authorization: `Bearer ${token}`,
       },
     });
+  },
+
+  /** Job matching: get external job provider status */
+  getJobProviders: async () => {
+    return request('/jobs/providers');
+  },
+
+  /** Job matching: fetch live external listings */
+  getLiveJobs: async (params = {}) => {
+    const query = new URLSearchParams();
+    if (params.search) query.append('search', params.search);
+    if (params.location) query.append('location', params.location);
+    if (params.role_category) query.append('role_category', params.role_category);
+    if (params.remote_only !== undefined) query.append('remote_only', params.remote_only);
+    if (params.provider) query.append('provider', params.provider);
+    if (params.limit) query.append('limit', params.limit);
+
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request(`/jobs/live${qs}`);
   },
 
   /** Job matching: get specific job detail with match metrics */
@@ -361,24 +406,367 @@ export const api = {
     return request('/jobs/vacancies');
   },
 
-  /** ATS score for uploaded resume (demo) */
-  getAtsScore:   async () => DEMO_ATS_SCORE,
+  /** ATS Evaluation: Score uploaded PDF/DOCX file */
+  scoreResumeFile: async (formData, token) => {
+    const base = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+    const res = await fetch(`${base}/api/v1/ats/score-file`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Upload failed with status ${res.status}`);
+    }
+    return res.json();
+  },
 
-  /** GitHub profile analysis (demo) */
-  getGitHub:     async () => DEMO_GITHUB,
+  /** ATS Evaluation: Score resume text */
+  scoreResumeText: async (payload, token) => {
+    return request('/ats/score-text', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+  },
 
-  /** Send message to AI career assistant (demo) */
-  chatAssistant: async (message) => ({
-    response: 'Based on your current skills, focus next on advanced SQL, machine learning model evaluation and statistics.',
-  }),
+  /** ATS Evaluation: Score latest uploaded resume */
+  scoreLatestResume: async (targetRole, token) => {
+    const qs = targetRole ? `?target_role=${encodeURIComponent(targetRole)}` : '';
+    return request(`/ats/score-latest${qs}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
 
-  /** Get learning roadmap for target role (demo) */
-  getRoadmap:    async (role = 'Data Scientist') => [],
+  /** ATS Evaluation: Get latest evaluation */
+  getLatestAtsScore: async (token) => {
+    if (!token) return null;
+    return request('/ats/latest', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
 
-  /** Start mock interview session (demo) */
-  startInterview: async () => ({
-    question: 'Explain the difference between supervised and unsupervised learning.',
-  }),
+  /** ATS Evaluation: Get evaluation history */
+  getAtsHistory: async (token) => {
+    if (!token) return [];
+    return request('/ats/history', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  /** ATS score for uploaded resume (backwards compatibility) */
+  getAtsScore: async (token) => {
+    if (!token) return DEMO_ATS_SCORE;
+    try {
+      const latest = await request('/ats/latest', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return latest || DEMO_ATS_SCORE;
+    } catch {
+      return DEMO_ATS_SCORE;
+    }
+  },
+
+  /** GitHub portfolio analysis */
+  analyzeGitHub: async ({ username, target_role }, token) => {
+    return request('/github/analyze', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ username, target_role }),
+    });
+  },
+
+  /** Get latest GitHub portfolio evaluation for authenticated student */
+  getLatestGitHub: async (token) => {
+    if (!token) return null;
+    return request('/github/latest', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  /** Get GitHub analysis history */
+  getGitHubHistory: async (token) => {
+    if (!token) return [];
+    return request('/github/history', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  /** Sync detected GitHub technical skills into student profile */
+  syncGitHubSkills: async (payload = {}, token) => {
+    return request('/github/sync-skills', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /** GitHub profile analysis (backwards compatibility) */
+  getGitHub: async (token) => {
+    if (!token) return DEMO_GITHUB;
+    try {
+      const latest = await request('/github/latest', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return latest || DEMO_GITHUB;
+    } catch {
+      return DEMO_GITHUB;
+    }
+  },
+
+  /** Send message to AI career assistant (live endpoint with backward compatibility fallback) */
+  chatAssistant: async (messageOrPayload, token) => {
+    if (!token) {
+      return {
+        response: 'Based on your current skills, focus next on advanced SQL, machine learning model evaluation and statistics.',
+      };
+    }
+    const payload = typeof messageOrPayload === 'string'
+      ? { message: messageOrPayload }
+      : (messageOrPayload || { message: 'Analyze my readiness' });
+
+    try {
+      const res = await request('/career-assistant/chat', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
+      });
+      return {
+        response: res.assistant_response,
+        conversation_id: res.conversation_id,
+        relevant_context: res.relevant_context,
+        provider_used: res.provider_used,
+      };
+    } catch {
+      return {
+        response: 'Based on your current skills, focus next on advanced SQL, machine learning model evaluation and statistics.',
+      };
+    }
+  },
+
+  /** Send structured message to Career Assistant */
+  sendCareerAssistantMessage: async (payload, token) => {
+    return request('/career-assistant/chat', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /** List student's career assistant conversations */
+  getCareerAssistantConversations: async (token) => {
+    if (!token) return [];
+    return request('/career-assistant/conversations', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  /** Get messages for a specific conversation */
+  getCareerAssistantMessages: async (conversationId, token) => {
+    if (!token || !conversationId) return null;
+    return request(`/career-assistant/conversations/${conversationId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  /** Delete a conversation */
+  deleteCareerAssistantConversation: async (conversationId, token) => {
+    return request(`/career-assistant/conversations/${conversationId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  /** Retry last assistant message in a conversation with live AI */
+  retryCareerAssistantMessage: async (conversationId, token) => {
+    return request(`/career-assistant/conversations/${conversationId}/retry`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  /** Get student CareerTwin context snapshot */
+  getCareerAssistantContext: async (targetRole, token) => {
+    if (!token) return null;
+    const query = targetRole ? `?target_role=${encodeURIComponent(targetRole)}` : '';
+    return request(`/career-assistant/context${query}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  /** Get learning roadmap for logged-in student */
+  getRoadmap: async (token) => {
+    if (!token) return null;
+    return request('/roadmap', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  /** Generate or regenerate personalized roadmap */
+  generateRoadmap: async (payload = {}, token) => {
+    return request('/roadmap/generate', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /** Toggle roadmap checklist topic item completion */
+  toggleRoadmapItem: async ({ item_id, is_completed }, token) => {
+    return request('/roadmap/toggle-item', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ item_id, is_completed }),
+    });
+  },
+
+  /** Get compact roadmap progress summary for dashboard */
+  getRoadmapSummary: async (token) => {
+    if (!token) return { has_roadmap: false, completion_percentage: 0 };
+    try {
+      return await request('/roadmap/summary', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch {
+      return { has_roadmap: false, completion_percentage: 0 };
+    }
+  },
+
+  /** Get mock interview setup context & defaults */
+  getMockInterviewContext: async (token) => {
+    if (!token) return null;
+    return request('/mock-interviews/context', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  /** Start personalized AI mock interview session */
+  startMockInterview: async (payload = {}, token) => {
+    return request('/mock-interviews/start', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /** Submit answer to active mock interview question */
+  submitMockInterviewAnswer: async (interviewId, payload, token) => {
+    return request(`/mock-interviews/${interviewId}/answer`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /** Complete mock interview session and generate final evaluation report */
+  completeMockInterview: async (interviewId, payload = {}, token) => {
+    return request(`/mock-interviews/${interviewId}/complete`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /** Get authenticated student's mock interview history */
+  getMockInterviewHistory: async (token) => {
+    if (!token) return [];
+    return request('/mock-interviews/history', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  /** Get details of a specific mock interview session */
+  getMockInterviewDetail: async (interviewId, token) => {
+    if (!token || !interviewId) return null;
+    return request(`/mock-interviews/${interviewId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  /** Get final report for a completed mock interview */
+  getMockInterviewReport: async (interviewId, token) => {
+    if (!token || !interviewId) return null;
+    return request(`/mock-interviews/${interviewId}/report`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  /** Delete a mock interview session */
+  deleteMockInterview: async (interviewId, token) => {
+    return request(`/mock-interviews/${interviewId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  /** Backward-compatible helper */
+  startInterview: async (payload = {}, token) => {
+    if (token) {
+      return request('/mock-interviews/start', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
+      });
+    }
+    return {
+      question: 'Explain the difference between supervised and unsupervised learning.',
+    };
+  },
+
+  /** Get report preview with current assessment statuses across all 10 modules */
+  getReportPreview: async (targetRole, token) => {
+    const query = targetRole ? `?target_role=${encodeURIComponent(targetRole)}` : '';
+    return request(`/reports/preview${query}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  /** Generate a new career readiness report */
+  generateReport: async (payload = {}, token) => {
+    return request('/reports/generate', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /** Get report generation history */
+  getReportHistory: async (token) => {
+    return request('/reports/history', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  /** Download generated PDF report */
+  downloadReportPdf: async (reportId, filename = 'CareerTwin_Report.pdf', token) => {
+    const url = `${API_BASE_URL}/reports/${reportId}/download`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      let errMsg = 'Failed to download report PDF';
+      try {
+        const errJson = await res.json();
+        errMsg = errJson.detail || errMsg;
+      } catch {
+        // use default
+      }
+      throw new Error(errMsg);
+    }
+    const blob = await res.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(downloadUrl);
+    return true;
+  },
 };
 
 export default api;

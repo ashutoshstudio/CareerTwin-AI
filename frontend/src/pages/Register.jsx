@@ -7,7 +7,8 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Mail, Lock, Eye, EyeOff, AlertCircle, Sparkles, ShieldCheck, KeyRound } from 'lucide-react';
-import { useAuth, validateEmailQuality, validatePasswordStrength } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
+import { validateEmailQuality, validatePasswordStrength } from '../utils/validation';
 import { GoogleAuthModal } from '../components/GoogleAuthModal';
 import { PersistentShiningDots } from '../components/PersistentShiningDots';
 
@@ -51,10 +52,11 @@ function Register() {
   const [otpError, setOtpError]         = useState('');
   const [verifyingOtp, setVerifyingOtp] = useState(false);
 
-  // Google modal state
+  // Google OAuth state
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
+  const [googleLoading, setGoogleLoading]         = useState(false);
 
-  const { register } = useAuth();
+  const { register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -131,6 +133,26 @@ function Register() {
       setGlobalError(err.message || 'Registration failed.');
     } finally {
       setVerifyingOtp(false);
+    }
+  };
+
+  const handleGoogleSignUp = async () => {
+    setGlobalError(null);
+    setAlreadyExists(false);
+    setGoogleLoading(true);
+    try {
+      const res = await loginWithGoogle(redirectUrl);
+      if (!res.success) {
+        if (res.notConfigured) {
+          setIsGoogleModalOpen(true);
+        } else {
+          setGlobalError(res.error || 'Could not initiate Google Sign-In.');
+        }
+        setGoogleLoading(false);
+      }
+    } catch {
+      setGlobalError('Unable to reach backend authentication server.');
+      setGoogleLoading(false);
     }
   };
 
@@ -501,11 +523,12 @@ function Register() {
               <div style={{ flex: 1, height: 1, background: 'rgba(15, 23, 42, 0.1)' }} />
             </div>
 
-            {/* ── Google Sign Up Button ─────────────── */}
+            {/* ── Google Sign Up Button (Initiates Real Google OAuth) ─────────────── */}
             <motion.button
               type="button"
-              onClick={() => setIsGoogleModalOpen(true)}
-              whileHover={{ scale: 1.02, y: -1 }}
+              onClick={handleGoogleSignUp}
+              disabled={googleLoading}
+              whileHover={{ scale: googleLoading ? 1 : 1.02, y: googleLoading ? 0 : -1 }}
               whileTap={{ scale: 0.98 }}
               id="google-signup-btn"
               style={{
@@ -517,7 +540,8 @@ function Register() {
                 color: 'var(--text-strong)',
                 fontSize: '.92rem',
                 fontWeight: 700,
-                cursor: 'pointer',
+                cursor: googleLoading ? 'wait' : 'pointer',
+                opacity: googleLoading ? 0.75 : 1,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -537,7 +561,7 @@ function Register() {
               }}
             >
               <GoogleIcon size={19} />
-              <span>Continue with Google</span>
+              <span>{googleLoading ? 'Connecting to Google...' : 'Continue with Google'}</span>
             </motion.button>
           </>
         ) : (

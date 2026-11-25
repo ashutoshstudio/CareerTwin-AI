@@ -235,7 +235,7 @@ def explain_student_assessment(
     base_val = float(raw_base[0]) if hasattr(raw_base, "__len__") else float(raw_base)
 
     sum_shap = float(np.sum(shap_vals))
-    reconstructed_score = round(base_val + sum_shap, 4)
+    reconstructed_score = round(round(base_val, 2) + round(sum_shap, 2), 2)
     actual_pred_rounded = round(actual_pred_score, 4)
     discrepancy = round(abs(actual_pred_rounded - reconstructed_score), 5)
     is_faithful = discrepancy < 0.05

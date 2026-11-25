@@ -8,27 +8,17 @@
  *   GET  /api/v1/recommendations/history
  */
 
-import React, { Component, useState, useEffect } from 'react';
+import { Component, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Compass,
-  Sparkles,
   CheckCircle2,
   AlertCircle,
   AlertTriangle,
   RefreshCw,
-  Award,
   TrendingUp,
-  Check,
-  X,
-  ArrowRight,
-  BookOpen,
-  Info,
   Clock,
-  ChevronRight,
   ShieldCheck,
-  Briefcase,
-  Layers,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
@@ -112,9 +102,9 @@ function getDemandBadgeStyle(demand) {
 }
 
 function AssessmentContent() {
-  const { user, token } = useAuth();
+  const { token } = useAuth();
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => Boolean(token));
   const [evaluating, setEvaluating] = useState(false);
   const [recommendationsData, setRecommendationsData] = useState(null);
   const [historyList, setHistoryList] = useState([]);
@@ -128,13 +118,9 @@ function AssessmentContent() {
     let isMounted = true;
 
     async function loadData() {
-      if (!token) {
-        setLoading(false);
-        return;
-      }
+      if (!token) return;
 
       try {
-        setLoading(true);
         const [recs, history] = await Promise.all([
           api.getRecommendations(token).catch((err) => {
             console.warn('Could not load latest recommendations:', err);

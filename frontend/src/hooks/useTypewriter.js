@@ -13,13 +13,17 @@ import { useState, useEffect } from 'react';
  * @returns {{ displayed: string, done: boolean }}
  */
 export function useTypewriter({ text = '', speed = 45, startDelay = 0 } = {}) {
+  const [prevText, setPrevText]   = useState(text);
   const [displayed, setDisplayed] = useState('');
   const [done, setDone]           = useState(false);
 
-  useEffect(() => {
+  if (prevText !== text) {
+    setPrevText(text);
     setDisplayed('');
     setDone(false);
+  }
 
+  useEffect(() => {
     let timeout;
     let interval;
 

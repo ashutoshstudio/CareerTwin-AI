@@ -22,12 +22,6 @@ import { DEMO_READINESS, DEMO_JOB_MATCHES } from '../services/api';
 import { Interactive3DAvatar } from '../components/Interactive3DAvatar';
 import { PersistentShiningDots } from '../components/PersistentShiningDots';
 
-/* ── Shared motion variants ─────────────────────────────────────────────── */
-const fadeUp = (delay = 0) => ({
-  hidden:  { opacity: 0, y: 32 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.65, delay, ease: [0.22, 1, 0.36, 1] } },
-});
-
 /* ── Reusable scroll reveal wrapper ────────────────────────────────────── */
 function Reveal({ children, delay = 0, className = '', y = 28 }) {
   const ref    = useRef(null);
@@ -47,7 +41,7 @@ function Reveal({ children, delay = 0, className = '', y = 28 }) {
 
 /* ── Floating particles component ───────────────────────────────────────── */
 function Particles({ count = 20 }) {
-  const particles = useRef(
+  const [particles] = useState(() =>
     Array.from({ length: count }, (_, i) => ({
       id: i,
       left: `${Math.random() * 100}%`,
@@ -57,7 +51,7 @@ function Particles({ count = 20 }) {
       delay: `${Math.random() * 8}s`,
       opacity: Math.random() * 0.6 + 0.3,
     }))
-  ).current;
+  );
 
   return (
     <div className="hero__particles">
@@ -682,8 +676,6 @@ function AssistantSection() {
   const { displayed: aiText, done: aiDone } = useTypewriter({ text: AI_REPLY, speed: 26, startDelay: 1200 });
   const ref    = useRef(null);
   const inView = useInView(ref, { once: true, margin: '-80px 0px' });
-  const [visible, setVisible] = useState(false);
-  useEffect(() => { if (inView) setVisible(true); }, [inView]);
 
   const assistantUrl = isAuthenticated ? '/assistant' : '/register?redirect=%2Fassistant';
 
@@ -726,7 +718,7 @@ function AssistantSection() {
                 initial={{ opacity: 0, y: 10, x: -20 }}
                 animate={inView ? { opacity: 1, y: 0, x: 0 } : {}}
                 transition={{ delay: 0.9 }}>
-                {visible ? (
+                {inView ? (
                   <>
                     {aiText}
                     {!aiDone && <span className="animate-blink" style={{ marginLeft: 2, opacity: 0.8 }}>▋</span>}

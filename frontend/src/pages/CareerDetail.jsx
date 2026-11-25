@@ -4,22 +4,41 @@
  * Uses CAREER_PATHS data from src/data/careerPaths.js
  */
 
-import { useParams, Link, Navigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useParams, Link, Navigate, useNavigate } from 'react-router-dom';
 import { CAREER_PATHS } from '../data/careerPaths';
-
-/* ── Level badge colours ─────────────────────────────────────── */
-const LEVEL_STYLE = {
-  Expert:       'background: rgba(20,184,166,.15); color: #2dd4bf; border: 1px solid rgba(20,184,166,.3);',
-  Intermediate: 'background: rgba(139,92,246,.15); color: #a78bfa; border: 1px solid rgba(139,92,246,.3);',
-  Beginner:     'background: rgba(245,158,11,.15);  color: #fbbf24; border: 1px solid rgba(245,158,11,.3);',
-};
+import { useAuth } from '../contexts/AuthContext';
+import { api } from '../services/api';
 
 function CareerDetail() {
   const { slug } = useParams();
+  const { user, token } = useAuth();
+  const navigate = useNavigate();
+  const [settingGoal, setSettingGoal] = useState(false);
+  const [goalFeedback, setGoalFeedback] = useState('');
+
   const career = CAREER_PATHS.find((c) => c.slug === slug);
 
   /* Redirect to /careers if slug not found */
   if (!career) return <Navigate to="/careers" replace />;
+
+  const handleSetTargetGoal = async () => {
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+    setSettingGoal(true);
+    setGoalFeedback('');
+    try {
+      await api.updateProfile({ target_role: career.title }, token);
+      setGoalFeedback(`✓ "${career.title}" set as your target career goal!`);
+      setTimeout(() => setGoalFeedback(''), 4000);
+    } catch (err) {
+      setGoalFeedback(`Failed to update goal: ${err.message || 'Server error'}`);
+    } finally {
+      setSettingGoal(false);
+    }
+  };
 
   return (
     <div id={`page-career-${slug}`} style={{ background: 'var(--bg)', minHeight: '100vh', paddingTop: '100px' }}>
@@ -55,18 +74,63 @@ function CareerDetail() {
             <p style={{ color: 'var(--text)', fontSize: '1.05rem', maxWidth: 560, lineHeight: 1.7, marginBottom: 16 }}>
               {career.tagline}
             </p>
-            <span style={{
-              display: 'inline-block',
-              padding: '5px 16px',
-              background: 'rgba(20,184,166,.1)',
-              border: '1px solid rgba(20,184,166,.25)',
-              borderRadius: 999,
-              fontSize: '.8rem',
-              fontWeight: 600,
-              color: 'var(--primary-light)',
-            }}>
-              {career.demand} demand
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginTop: 16 }}>
+              <span style={{
+                display: 'inline-block',
+                padding: '5px 16px',
+                background: 'rgba(20,184,166,.1)',
+                border: '1px solid rgba(20,184,166,.25)',
+                borderRadius: 999,
+                fontSize: '.8rem',
+                fontWeight: 600,
+                color: 'var(--primary-light)',
+              }}>
+                {career.demand} demand
+              </span>
+
+              {user ? (
+                <button
+                  type="button"
+                  onClick={handleSetTargetGoal}
+                  disabled={settingGoal}
+                  style={{
+                    padding: '6px 16px',
+                    background: 'linear-gradient(135deg, #0d9488, #10b981)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: 999,
+                    fontSize: '.8rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(13, 148, 136, 0.2)',
+                  }}
+                >
+                  {settingGoal ? 'Setting...' : '🎯 Set as My Target Goal'}
+                </button>
+              ) : (
+                <Link
+                  to="/register"
+                  style={{
+                    padding: '6px 16px',
+                    background: 'rgba(20, 184, 166, 0.1)',
+                    border: '1px solid rgba(20, 184, 166, 0.3)',
+                    color: '#0d9488',
+                    borderRadius: 999,
+                    fontSize: '.8rem',
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                  }}
+                >
+                  Sign Up to Track This Goal →
+                </Link>
+              )}
+            </div>
+
+            {goalFeedback && (
+              <div style={{ marginTop: 10, fontSize: '.82rem', color: '#0d9488', fontWeight: 600 }}>
+                {goalFeedback}
+              </div>
+            )}
           </div>
           <div style={{
             background: 'rgba(20,184,166,.08)',
@@ -208,6 +272,48 @@ function CareerDetail() {
         </div>
 
         {/* ── Companies ────────────────────────────────────────── */}
+        {/* Recommended Capstone Projects & Technical Interview Focus */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 24 }}>
+          {/* Projects */}
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 20, padding: '28px 30px' }}>
+            <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-strong)', marginBottom: 16 }}>🚀 Recommended Capstone Projects</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {(career.recommended_projects || []).map((proj, idx) => (
+                <div key={idx} style={{
+                  padding: '12px 14px',
+                  background: 'rgba(20, 184, 166, 0.06)',
+                  border: '1px solid rgba(20, 184, 166, 0.2)',
+                  borderRadius: 12,
+                  fontSize: '.82rem',
+                  color: 'var(--text)',
+                  lineHeight: 1.5,
+                }}>
+                  📌 {proj}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Interview Topics */}
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 20, padding: '28px 30px' }}>
+            <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-strong)', marginBottom: 16 }}>🎯 Technical Interview Focus</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {(career.interview_topics || []).map((topic, idx) => (
+                <div key={idx} style={{
+                  padding: '8px 12px',
+                  background: 'var(--bg-2, #f8fafc)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 10,
+                  fontSize: '.8rem',
+                  color: 'var(--text-sec)',
+                }}>
+                  💬 {topic}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 20, padding: '28px 36px', marginBottom: 48 }}>
           <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-strong)', marginBottom: 16 }}>🏢 Companies Hiring</h2>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>

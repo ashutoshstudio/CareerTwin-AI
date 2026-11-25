@@ -3,57 +3,13 @@
  * Connected to FastAPI backend JWT endpoints.
  */
 
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
+import { validateEmailQuality, validatePasswordStrength } from '../utils/validation';
 
 const AuthContext = createContext(null);
 
 const AUTH_USER_KEY = 'careertwin_auth_user';
-
-// Helper to validate email quality (format & disposable domains)
-const BLOCKED_DOMAINS = [
-  'test.com',
-  'fake.com',
-  'tempmail.com',
-  'throwaway.com',
-  'mailinator.com',
-  '10minutemail.com',
-  'guerrillamail.com',
-  'asdf.com',
-  'xyz.com',
-  'abc.com',
-];
-
-export function validateEmailQuality(email) {
-  const normalized = email.trim().toLowerCase();
-  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-  if (!emailRegex.test(normalized)) {
-    return { valid: false, error: 'Please enter a valid email address.' };
-  }
-
-  const domain = normalized.split('@')[1];
-  if (BLOCKED_DOMAINS.includes(domain)) {
-    return {
-      valid: false,
-      error: `Disposable and test domains (@${domain}) are not allowed. Please use an authentic email address.`,
-    };
-  }
-
-  return { valid: true, domain };
-}
-
-// Helper to validate password strength
-export function validatePasswordStrength(password) {
-  if (!password || password.length < 6) {
-    return { valid: false, error: 'Password must be at least 6 characters long.' };
-  }
-  const hasLetter = /[a-zA-Z]/.test(password);
-  const hasNumber = /[0-9]/.test(password);
-  if (!hasLetter || !hasNumber) {
-    return { valid: false, error: 'Password must contain both letters and numbers.' };
-  }
-  return { valid: true };
-}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
@@ -67,6 +23,14 @@ export function AuthProvider({ children }) {
 
   const isAuthenticated = Boolean(user && user.token);
   const token = user?.token || null;
+
+  /**
+   * Log out active session
+   */
+  const logout = useCallback(() => {
+    setUser(null);
+    localStorage.removeItem(AUTH_USER_KEY);
+  }, []);
 
   // Automatically detect and clear stale or expired session tokens
   useEffect(() => {
@@ -88,7 +52,22 @@ export function AuthProvider({ children }) {
     return () => {
       window.removeEventListener('careertwin:auth-expired', handleAuthExpired);
     };
-  }, [token]);
+  }, [token, logout]);
+
+  const persistAuthSession = useCallback((res) => {
+    const activeUser = {
+      id: res.user.id,
+      name: res.user.full_name,
+      email: res.user.email,
+      role: res.user.role,
+      authProvider: res.user.auth_provider || 'local',
+      token: res.access_token,
+      loggedInAt: new Date().toISOString(),
+    };
+    setUser(activeUser);
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(activeUser));
+    return activeUser;
+  }, []);
 
   /**
    * Register a new user with FastAPI backend
@@ -106,17 +85,7 @@ export function AuthProvider({ children }) {
 
     try {
       const res = await api.register({ name, email, password });
-      const activeUser = {
-        id: res.user.id,
-        name: res.user.full_name,
-        email: res.user.email,
-        role: res.user.role,
-        token: res.access_token,
-        loggedInAt: new Date().toISOString(),
-      };
-
-      setUser(activeUser);
-      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(activeUser));
+      const activeUser = persistAuthSession(res);
       return { success: true, user: activeUser };
     } catch (err) {
       if (err.status === 409) {
@@ -144,17 +113,7 @@ export function AuthProvider({ children }) {
 
     try {
       const res = await api.login({ email, password });
-      const activeUser = {
-        id: res.user.id,
-        name: res.user.full_name,
-        email: res.user.email,
-        role: res.user.role,
-        token: res.access_token,
-        loggedInAt: new Date().toISOString(),
-      };
-
-      setUser(activeUser);
-      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(activeUser));
+      const activeUser = persistAuthSession(res);
       return { success: true, user: activeUser };
     } catch (err) {
       if (err.status === 401) {
@@ -172,14 +131,50 @@ export function AuthProvider({ children }) {
   };
 
   /**
-   * Google OAuth handler notice
+   * Initiate real Google OAuth 2.0 Authorization Code flow
    */
-  const loginWithGoogle = async () => {
-    return {
-      success: false,
-      error: 'Google OAuth authentication requires production OAuth credentials. Please register or sign in using your email and password.',
-    };
-  };
+  const loginWithGoogle = useCallback(async (redirectPath = '/dashboard') => {
+    try {
+      const res = await api.getGoogleAuthUrl(redirectPath);
+      if (res?.authorization_url) {
+        window.location.assign(res.authorization_url);
+        return { success: true, redirecting: true };
+      }
+      return {
+        success: false,
+        notConfigured: true,
+        error: 'Unable to obtain Google authorization URL.',
+      };
+    } catch (err) {
+      if (err.status === 503) {
+        return {
+          success: false,
+          notConfigured: true,
+          error: err.message || 'Google OAuth credentials are not configured on the backend server.',
+        };
+      }
+      return {
+        success: false,
+        error: err.message || 'Failed to initiate Google Sign-In.',
+      };
+    }
+  }, []);
+
+  /**
+   * Complete Google OAuth sign-in by exchanging single-use callback ticket for JWT
+   */
+  const completeGoogleLogin = useCallback(async (ticket) => {
+    try {
+      const res = await api.exchangeGoogleTicket(ticket);
+      const activeUser = persistAuthSession(res);
+      return { success: true, user: activeUser };
+    } catch (err) {
+      return {
+        success: false,
+        error: err.message || 'Failed to finalize Google Sign-In session.',
+      };
+    }
+  }, [persistAuthSession]);
 
   /**
    * Update active user attributes in context
@@ -194,12 +189,8 @@ export function AuthProvider({ children }) {
   };
 
   /**
-   * Log out active session
+   * Log out active session is hoisted above
    */
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem(AUTH_USER_KEY);
-  };
 
   return (
     <AuthContext.Provider
@@ -210,6 +201,7 @@ export function AuthProvider({ children }) {
         login,
         register,
         loginWithGoogle,
+        completeGoogleLogin,
         updateUser,
         logout,
       }}
@@ -219,6 +211,7 @@ export function AuthProvider({ children }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {

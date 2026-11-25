@@ -4,8 +4,9 @@
  * Connected to FastAPI backend: GET /api/v1/profile/me & PUT /api/v1/profile/me
  */
 
-import React, { Component, useState, useEffect, useCallback } from 'react';
+import { Component, useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ALL_SUPPORTED_ROLES } from '../data/careerPaths';
 import {
   User,
   GraduationCap,
@@ -41,16 +42,7 @@ function LinkedinIcon({ size = 16, style = {} }) {
   );
 }
 
-const TARGET_ROLES = [
-  'Data Scientist',
-  'Machine Learning Eng.',
-  'Full Stack Developer',
-  'Cloud Engineer',
-  'Cybersecurity Analyst',
-  'Product Manager',
-  'Data Analyst',
-  'Software Engineer',
-];
+const TARGET_ROLES = ALL_SUPPORTED_ROLES;
 
 const EDUCATION_LEVELS = [
   'Bachelor of Computer Applications (BCA)',
@@ -65,7 +57,7 @@ const EDUCATION_LEVELS = [
 function Profile() {
   const { user, token, updateUser } = useAuth();
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => Boolean(token));
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -87,13 +79,10 @@ function Profile() {
   const [newSkillName, setNewSkillName] = useState('');
   const [newSkillLevel, setNewSkillLevel] = useState(3);
 
-  const fetchProfile = useCallback(async () => {
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+  const fetchProfile = useCallback(async (showLoadingSpinner = false) => {
+    if (!token) return;
+    if (showLoadingSpinner) setLoading(true);
     try {
-      setLoading(true);
       setErrorMsg('');
       const data = await api.getProfile(token);
       setFullName(data.full_name || user?.name || '');
@@ -115,8 +104,40 @@ function Profile() {
   }, [token, user]);
 
   useEffect(() => {
-    fetchProfile();
-  }, [fetchProfile]);
+    let ignore = false;
+    if (!token) return;
+
+    async function load() {
+      try {
+        setErrorMsg('');
+        const data = await api.getProfile(token);
+        if (!ignore) {
+          setFullName(data.full_name || user?.name || '');
+          setEmail(data.email || user?.email || '');
+          setHeadline(data.headline || '');
+          setEducationLevel(data.education_level || '');
+          setInstitution(data.institution || '');
+          setGraduationYear(data.graduation_year ? String(data.graduation_year) : '');
+          setExperienceMonths(data.experience_months || 0);
+          setGithubUrl(data.github_url || '');
+          setLinkedinUrl(data.linkedin_url || '');
+          setTargetRole(data.target_role || '');
+          setSkills(Array.isArray(data.skills) ? data.skills : []);
+        }
+      } catch (err) {
+        if (!ignore) {
+          setErrorMsg(err.message || 'Failed to load profile. Please verify the backend server.');
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    }
+
+    load();
+    return () => { ignore = true; };
+  }, [token, user]);
 
   const handleAddSkill = (e) => {
     e.preventDefault();

@@ -15,29 +15,10 @@ ARTIFACTS_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "ml"
 MODEL_PATH = ARTIFACTS_DIR / "readiness_models.joblib"
 METADATA_PATH = ARTIFACTS_DIR / "readiness_metadata.json"
 
-SUPPORTED_ROLES = [
-    "Data Analyst",
-    "Python Developer",
-    "Machine Learning Engineer",
-]
-
-ROLE_COMPETENCIES: Dict[str, Dict[str, Any]] = {
-    "Data Analyst": {
-        "code": 0,
-        "core_skills": ["SQL", "Python", "Excel", "Power BI", "Tableau", "Statistics"],
-        "secondary_skills": ["Pandas", "NumPy", "Communication", "Problem Solving"],
-    },
-    "Python Developer": {
-        "code": 1,
-        "core_skills": ["Python", "SQL", "Git", "FastAPI", "Flask", "Django", "HTML", "CSS", "JavaScript"],
-        "secondary_skills": ["Docker", "Linux", "CI/CD", "Communication", "Problem Solving"],
-    },
-    "Machine Learning Engineer": {
-        "code": 2,
-        "core_skills": ["Python", "Machine Learning", "Scikit-learn", "Pandas", "NumPy", "SQL"],
-        "secondary_skills": ["Deep Learning", "TensorFlow", "PyTorch", "Docker", "FastAPI", "Git", "Statistics"],
-    },
-}
+from app.core.roles_catalog import (
+    ROLE_COMPETENCIES,
+    SUPPORTED_ROLES,
+)
 
 DEGREE_WEIGHTS: Dict[str, float] = {
     "Master of Computer Applications (MCA)": 1.0,
@@ -181,7 +162,7 @@ def _train_and_save_benchmark_model() -> Dict[str, Any]:
     degree = rng.choice([0.2, 0.5, 0.75, 0.85, 1.0], size=N, p=[0.1, 0.15, 0.35, 0.30, 0.10])
     github = rng.binomial(1, 0.55, size=N).astype(float)
     linkedin = rng.binomial(1, 0.65, size=N).astype(float)
-    role_code = rng.choice([0, 1, 2], size=N)
+    role_code = rng.choice(len(SUPPORTED_ROLES), size=N)
 
     X = np.column_stack([
         core_cov,
@@ -276,9 +257,22 @@ def _train_and_save_benchmark_model() -> Dict[str, Any]:
 
 def get_model_bundle() -> Tuple[Any, Dict[str, Any]]:
     """
-    Load cached models and metadata, training on the fly if artifacts do not yet exist.
+    Load cached models and metadata, training on the fly if artifacts do not yet exist
+    or if the supported roles count has expanded.
     """
+    needs_train = False
     if not MODEL_PATH.exists() or not METADATA_PATH.exists():
+        needs_train = True
+    else:
+        try:
+            with open(METADATA_PATH, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+            if len(meta.get("supported_roles", [])) < len(SUPPORTED_ROLES):
+                needs_train = True
+        except Exception:
+            needs_train = True
+
+    if needs_train:
         _train_and_save_benchmark_model()
 
     bundle = joblib.load(MODEL_PATH)

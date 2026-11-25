@@ -6,7 +6,6 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Mail, ShieldAlert, ArrowRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
 
 function GoogleIcon({ size = 24 }) {
   return (
@@ -131,11 +130,10 @@ export function GoogleAuthModal({ isOpen, onClose }) {
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#b45309', fontWeight: 700, fontSize: '.86rem', marginBottom: 6 }}>
               <ShieldAlert size={17} style={{ flexShrink: 0 }} />
-              <span>OAuth Not Configured in Development</span>
+              <span>Google OAuth Credentials Required</span>
             </div>
             <p style={{ fontSize: '.82rem', color: 'var(--text)', lineHeight: 1.5, margin: 0 }}>
-              Google OAuth authentication requires production credentials (Google Cloud Client ID & Secret).
-              In this local development environment, please use standard <strong>Email & Password</strong> authentication.
+              Real Google OAuth 2.0 authentication is active on the backend, but <strong>GOOGLE_CLIENT_ID</strong> and <strong>GOOGLE_CLIENT_SECRET</strong> are not yet populated in <code>backend/.env</code>. Set them in your local environment to enable live Google Sign-In, or use standard <strong>Email &amp; Password</strong> below.
             </p>
           </div>
 

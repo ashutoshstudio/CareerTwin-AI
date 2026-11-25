@@ -4,37 +4,25 @@
  * Connected to FastAPI backend: POST /api/v1/skill-gap/analyze & GET /api/v1/skill-gap/latest
  */
 
-import React, { Component, useState, useEffect } from 'react';
+import { Component, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Target,
   CheckCircle2,
   AlertCircle,
-  AlertTriangle,
   RefreshCw,
   Sparkles,
-  Check,
-  X,
-  TrendingUp,
   Clock,
-  Layers,
-  ArrowUpRight,
   BookOpen,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 import Loading from '../components/Loading';
-
-const SUPPORTED_ROLES = [
-  'Data Analyst',
-  'Python Developer',
-  'Machine Learning Engineer',
-];
+import { CATEGORIZED_ROLES } from '../data/careerPaths';
 
 function SkillGap() {
-  const { user, token } = useAuth();
+  const { token } = useAuth();
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => Boolean(token));
   const [analyzing, setAnalyzing] = useState(false);
   const [selectedRole, setSelectedRole] = useState('Data Analyst');
   const [includeResumeSkills, setIncludeResumeSkills] = useState(true);
@@ -47,14 +35,10 @@ function SkillGap() {
   // Initial data loading
   useEffect(() => {
     let isMounted = true;
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+    if (!token) return;
 
     async function loadInitial() {
       try {
-        setLoading(true);
         setErrorMsg('');
 
         // 1. Fetch latest skill gap
@@ -247,8 +231,12 @@ function SkillGap() {
               handleRunAnalysis(e.target.value);
             }}
           >
-            {SUPPORTED_ROLES.map((role) => (
-              <option key={role} value={role}>{role}</option>
+            {CATEGORIZED_ROLES.map((group) => (
+              <optgroup key={group.category} label={group.category}>
+                {group.roles.map((role) => (
+                  <option key={role} value={role}>{role}</option>
+                ))}
+              </optgroup>
             ))}
           </select>
 

@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import Generator
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from app.core.config import settings
 
@@ -47,5 +47,22 @@ def init_db() -> None:
     import app.models.skill_gap  # noqa: F401
     import app.models.recommendation  # noqa: F401
     import app.models.job  # noqa: F401
+    import app.models.roadmap  # noqa: F401
+    import app.models.ats  # noqa: F401
+    import app.models.github  # noqa: F401
+    import app.models.report  # noqa: F401
+    import app.models.career_assistant  # noqa: F401
+    import app.models.mock_interview  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+
+    # Ensure backward-compatible SQLite columns exist on pre-existing databases
+    with engine.begin() as conn:
+        if settings.DATABASE_URL.startswith("sqlite"):
+            cols = {row[1] for row in conn.execute(text("PRAGMA table_info(users)")).fetchall()}
+            if cols:
+                if "google_id" not in cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN google_id VARCHAR(255)"))
+                    conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_google_id ON users (google_id)"))
+                if "auth_provider" not in cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN auth_provider VARCHAR(50) NOT NULL DEFAULT 'local'"))

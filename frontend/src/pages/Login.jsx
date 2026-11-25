@@ -7,7 +7,8 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff, AlertCircle, UserPlus, Sparkles } from 'lucide-react';
-import { useAuth, validateEmailQuality } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
+import { validateEmailQuality } from '../utils/validation';
 import { GoogleAuthModal } from '../components/GoogleAuthModal';
 import { PersistentShiningDots } from '../components/PersistentShiningDots';
 
@@ -43,14 +44,33 @@ function Login() {
   const [accountNotFound, setAccountNotFound] = useState(false);
   const [shaking, setShaking]           = useState(false);
 
-  // Google modal state
+  // Google OAuth state
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
+  const [googleLoading, setGoogleLoading]         = useState(false);
 
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   const redirectUrl = searchParams.get('redirect') || '/dashboard';
+
+  const OAUTH_ERROR_MESSAGES = {
+    cancelled: 'Google Sign-In was cancelled. You can try again or use email and password.',
+    oauth_denied: 'Google authentication access was denied.',
+    invalid_state: 'Security verification (CSRF state) expired or did not match. Please try again.',
+    missing_code: 'Google did not return an authorization code. Please try again.',
+    invalid_code: 'Authorization code expired or already used. Please try signing in again.',
+    token_exchange_failed: 'Failed to communicate with Google authentication servers.',
+    invalid_token: 'Google identity verification failed or token expired.',
+    unverified_email: 'Your Google account email address is not verified.',
+    account_conflict: 'This email address is already linked to a different Google account.',
+    inactive_account: 'Your account is currently inactive. Please contact support.',
+  };
+  const oauthErrorCode = searchParams.get('oauth_error');
+  const oauthErrorText = oauthErrorCode
+    ? (OAUTH_ERROR_MESSAGES[oauthErrorCode] || 'Google authentication failed. Please try again.')
+    : null;
+  const activeGlobalError = globalError || oauthErrorText;
 
   const validate = () => {
     const newErrors = {};
@@ -97,6 +117,26 @@ function Login() {
       navigate(redirectUrl, { replace: true });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setGlobalError(null);
+    setAccountNotFound(false);
+    setGoogleLoading(true);
+    try {
+      const res = await loginWithGoogle(redirectUrl);
+      if (!res.success) {
+        if (res.notConfigured) {
+          setIsGoogleModalOpen(true);
+        } else {
+          setGlobalError(res.error || 'Could not start Google Sign-In.');
+        }
+        setGoogleLoading(false);
+      }
+    } catch {
+      setGlobalError('Unable to reach backend authentication server.');
+      setGoogleLoading(false);
     }
   };
 
@@ -152,7 +192,7 @@ function Login() {
         </p>
 
         {/* Informative redirect badge */}
-        {redirectUrl && redirectUrl !== '/dashboard' && !globalError && (
+        {redirectUrl && redirectUrl !== '/dashboard' && !activeGlobalError && (
           <motion.div
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
@@ -177,7 +217,7 @@ function Login() {
 
         {/* Global / Not Found Error Alert */}
         <AnimatePresence>
-          {globalError && (
+          {activeGlobalError && (
             <motion.div
               initial={{ opacity: 0, y: -8, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -194,7 +234,7 @@ function Login() {
             >
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: accountNotFound ? 10 : 0 }}>
                 <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 2 }} />
-                <span>{globalError}</span>
+                <span>{activeGlobalError}</span>
               </div>
 
               {accountNotFound && (
@@ -406,11 +446,12 @@ function Login() {
           <div style={{ flex: 1, height: 1, background: 'rgba(15, 23, 42, 0.1)' }} />
         </div>
 
-        {/* ── Google Sign In Button (Opens GoogleAuthModal) ─── */}
+        {/* ── Google Sign In Button (Initiates Real Google OAuth) ─── */}
         <motion.button
           type="button"
-          onClick={() => setIsGoogleModalOpen(true)}
-          whileHover={{ scale: 1.02, y: -1 }}
+          onClick={handleGoogleSignIn}
+          disabled={googleLoading || loading}
+          whileHover={{ scale: googleLoading ? 1 : 1.02, y: googleLoading ? 0 : -1 }}
           whileTap={{ scale: 0.98 }}
           id="google-signin-btn"
           style={{
@@ -422,7 +463,8 @@ function Login() {
             color: 'var(--text-strong)',
             fontSize: '.92rem',
             fontWeight: 700,
-            cursor: 'pointer',
+            cursor: googleLoading ? 'wait' : 'pointer',
+            opacity: googleLoading ? 0.75 : 1,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -442,7 +484,7 @@ function Login() {
           }}
         >
           <GoogleIcon size={19} />
-          <span>Continue with Google</span>
+          <span>{googleLoading ? 'Connecting to Google...' : 'Continue with Google'}</span>
         </motion.button>
 
         <p style={{ textAlign: 'center', marginTop: 24, fontSize: '.84rem', color: 'var(--text-muted)' }}>
